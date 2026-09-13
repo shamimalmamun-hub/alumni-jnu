@@ -1,0 +1,8 @@
+{
+  "name": "উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন",
+  "description": "উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

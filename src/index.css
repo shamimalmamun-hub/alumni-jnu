@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Noto Sans Bengali', 'Hind Siliguri', 'Noto Serif Bengali', system-ui, -apple-system, sans-serif;
+  --font-siliguri: 'Noto Serif Bengali', 'Tiro Bangla', 'Noto Sans Bengali', sans-serif;
+  --font-serif-bn: 'Noto Serif Bengali', 'Tiro Bangla', serif;
+  --font-anek: 'Anek Bangla', 'Noto Sans Bengali', sans-serif;
+  --font-tiro: 'Tiro Bangla', 'Noto Serif Bengali', serif;
+  --font-mono: 'Noto Serif Bengali', 'Tiro Bangla', 'Inter', sans-serif;
+}
+
+@layer utilities {
+  .bg-portal-pattern {
+    background: transparent;
+  }
+  
+  .bg-botany-pattern {
+    background-color: #f0f7f1;
+    background-image: 
+      radial-gradient(#1665341a 1.2px, transparent 1.2px),
+      radial-gradient(#15803d12 1.2px, #f0f7f1 1.2px);
+    background-size: 32px 32px;
+    background-position: 0 0, 16px 16px;
+  }
+
+  .bg-gov-pattern {
+    background-color: #f2f7f3;
+    background-image: repeating-linear-gradient(45deg, rgba(21, 128, 61, 0.04) 0, rgba(21, 128, 61, 0.04) 1px, transparent 0, transparent 50%);
+    background-size: 12px 12px;
+  }
+
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  
+  .text-shadow-botany {
+    text-shadow: 0 2px 4px rgba(6, 46, 26, 0.6);
+  }
+}
+
+body {
+  font-family: 'Noto Sans Bengali', 'Hind Siliguri', 'Anek Bangla', system-ui, -apple-system, sans-serif;
+  color: #0f172a;
+  background-color: #eaf2eb;
+  background-image: 
+    radial-gradient(#16653418 1.5px, transparent 1.5px),
+    radial-gradient(#15803d10 1.5px, #eaf2eb 1.5px);
+  background-size: 36px 36px;
+  background-position: 0 0, 18px 18px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
+.font-siliguri {
+  font-family: 'Noto Serif Bengali', 'Tiro Bangla', 'Noto Sans Bengali', sans-serif !important;
+}
+
+.font-serif-bn {
+  font-family: 'Noto Serif Bengali', 'Tiro Bangla', serif !important;
+}
+
+.font-anek {
+  font-family: 'Anek Bangla', 'Noto Sans Bengali', sans-serif !important;
+}
+
+.font-tiro {
+  font-family: 'Tiro Bangla', 'Noto Serif Bengali', serif !important;
+}
+
+.font-mono,
+.font-number,
+.font-num,
+.font-numeric {
+  font-family: 'Noto Serif Bengali', 'Tiro Bangla', 'Inter', sans-serif !important;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="number"],
+input[type="tel"],
+.number-text {
+  font-family: 'Noto Serif Bengali', 'Tiro Bangla', sans-serif !important;
+}
+
+.font-bkash {
+  font-family: 'Rubik', 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Botanical Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #eaf2eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #15803d;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0f5132;
+}
+
+/* Official A4 Membership Form Print Styles */
+@media print {
+  nav,
+  header,
+  footer,
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #a4-membership-form-print {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 8mm 10mm !important;
+    border: 2px solid #006a4e !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 6mm 6mm;
+  }
+}
+

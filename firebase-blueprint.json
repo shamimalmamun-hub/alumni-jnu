@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "membershipApplication": {
+      "title": "Membership Application",
+      "description": "Primary membership application for BNP Madhupur",
+      "type": "object",
+      "properties": {
+        "applicantNameBn": { "type": "string", "maxLength": 100 },
+        "applicantNameEn": { "type": "string", "maxLength": 100 },
+        "mobile": { "type": "string", "maxLength": 15 },
+        "nidOrBirthNo": { "type": "string", "maxLength": 30 },
+        "unionOrWard": { "type": "string", "maxLength": 100 },
+        "upazila": { "type": "string", "maxLength": 50 },
+        "district": { "type": "string", "maxLength": 50 },
+        "feeAmount": { "type": "string", "maxLength": 10 },
+        "paymentMethod": { "type": "string", "maxLength": 50 },
+        "senderNumber": { "type": "string", "maxLength": 30 },
+        "transactionId": { "type": "string", "maxLength": 50 },
+        "paymentStatus": { "type": "string", "enum": ["paid", "unpaid", "pending"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminNotes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["applicantNameBn", "mobile", "unionOrWard", "transactionId"]
+    },
+    "contactMessage": {
+      "title": "Contact Message",
+      "description": "Contact or inquiry message submitted by user",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 15 },
+        "email": { "type": "string", "maxLength": 100 },
+        "subject": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["unread", "read", "resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "message"]
+    },
+    "noticeItem": {
+      "title": "Notice or Announcement",
+      "description": "Party notice or press announcement",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "date": { "type": "string", "maxLength": 30 },
+        "isUrgent": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "category"]
+    },
+    "paymentRecord": {
+      "title": "Payment Record",
+      "description": "Alumni membership and event fee payments",
+      "type": "object",
+      "properties": {
+        "receiptNo": { "type": "string", "maxLength": 50 },
+        "payerName": { "type": "string", "maxLength": 100 },
+        "payerNameBn": { "type": "string", "maxLength": 100 },
+        "membershipId": { "type": "string", "maxLength": 50 },
+        "paymentPurpose": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "string", "maxLength": 20 },
+        "paymentMethod": { "type": "string", "maxLength": 50 },
+        "senderNumber": { "type": "string", "maxLength": 50 },
+        "transactionId": { "type": "string", "maxLength": 50 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 100 },
+        "batchSession": { "type": "string", "maxLength": 50 },
+        "note": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["payerName", "transactionId", "amount", "paymentMethod"]
+    }
+  },
+  "firestore": {
+    "/memberships/{membershipId}": {
+      "schema": { "$ref": "membershipApplication" },
+      "description": "Store primary membership applications securely"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "paymentRecord" },
+      "description": "Store payment submissions and receipts"
+    },
+    "/contacts/{contactId}": {
+      "schema": { "$ref": "contactMessage" },
+      "description": "Store contact messages and inquiries"
+    },
+    "/notices/{noticeId}": {
+      "schema": { "$ref": "noticeItem" },
+      "description": "Store dynamic administrative notices and announcements"
+    }
+  }
+}
