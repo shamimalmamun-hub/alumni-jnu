@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Memberships collection - public can submit applications, admin/portal can read/update status
+    match /memberships/{membershipId} {
+      allow read, write: if true;
+    }
+
+    // Payments collection - alumni fee payments and receipts
+    match /payments/{paymentId} {
+      allow read, write: if true;
+    }
+
+    // Contacts collection - public can submit inquiries, admin can read/manage
+    match /contacts/{contactId} {
+      allow read, write: if true;
+    }
+
+    // Notices collection - announcements & press releases
+    match /notices/{noticeId} {
+      allow read, write: if true;
+    }
+
+    // Recent News collection - news posts for slider
+    match /recent_news/{newsId} {
+      allow read, write: if true;
+    }
+
+    // Feedback & Advice submissions from homepage
+    match /feedback_messages/{feedbackId} {
+      allow read, write: if true;
+    }
+
+    // Application settings (SMS templates, gateway configs)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Site settings (Community stats, site configs)
+    match /site_settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Fallback catch-all for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
