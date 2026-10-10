@@ -1,0 +1,211 @@
+import React from 'react';
+import { Phone, Mail, MapPin, Facebook, GraduationCap, BookOpen, Library, Landmark, Award } from 'lucide-react';
+
+interface FooterProps {
+  language: 'bn' | 'en';
+}
+
+export const Footer: React.FC<FooterProps> = ({ language }) => {
+  return (
+    <footer id="main-portal-footer" className="w-full bg-[#16221d] text-white text-base border-t-4 border-[#008e48] font-siliguri">
+      <div className="w-full h-full">
+        {/* Main footer contents */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-7 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7">
+          {/* Col 1: About Jagannath University - Botany */}
+          <div className="space-y-3">
+            <div className="flex flex-col items-start gap-3">
+              {/* Logos on Top */}
+              <div className="flex items-center gap-3">
+                {/* Botany Alumni Association Logo */}
+                <div className="w-13 h-13 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-white rounded-full p-0.5 shadow-md border border-emerald-400/60">
+                  <img
+                    src="/jnu_botany_alumni_logo.jpg"
+                    alt="Botany Alumni Association Logo"
+                    className="w-full h-full object-contain rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                {/* Jagannath University Official Logo */}
+                <div className="w-13 h-13 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-white rounded-full p-1 shadow-md border border-amber-400/60">
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/en/thumb/4/47/Logo_of_Jagannath_University.svg/960px-Logo_of_Jagannath_University.svg.png?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+                    alt="Jagannath University Logo"
+                    className="w-full h-full object-contain rounded-full"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/en/4/47/Logo_of_Jagannath_University.svg";
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Text underneath */}
+              <div>
+                <h3 className="font-bold text-lg sm:text-lg text-emerald-300 leading-tight">
+                  {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
+                </h3>
+                <p className="text-amber-300 text-sm sm:text-sm font-semibold mt-0.5">
+                  {language === 'bn' ? 'জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা' : 'Jagannath University, Dhaka'}
+                </p>
+              </div>
+            </div>
+            <p className="text-gray-200 leading-relaxed text-sm sm:text-sm">
+              {language === 'bn'
+                ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশনের অফিসিয়াল ওয়েবসাইট। প্রাক্তন ও বর্তমান শিক্ষার্থীদের সেতুবন্ধন ও কল্যাণে নিবেদিত।'
+                : 'Official Alumni Website of Botany Alumni Association. Fostering fraternity and student welfare.'}
+            </p>
+          </div>
+
+          {/* Col 2: Association Wings & Activities */}
+          <div className="space-y-3.5">
+            <h4 className="font-bold text-amber-300 text-base sm:text-lg border-b border-emerald-800/80 pb-2 uppercase tracking-wide">
+              {language === 'bn' ? 'অ্যালামনাই কার্যক্রম ও সেল' : 'Alumni Wings & Activities'}
+            </h4>
+            <ul className="space-y-2.5 text-gray-200 text-sm sm:text-[15px]">
+              <li>
+                <a href="#membership" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'অ্যালামনাই সদস্য নিবন্ধন' : 'Alumni Member Registration'}
+                </a>
+              </li>
+              <li>
+                <a href="#members-directory" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'নিবন্ধিত সদস্য ডিরেক্টরি' : 'Registered Member Directory'}
+                </a>
+              </li>
+              <li>
+                <a href="#reunion" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'পুনর্মিলনী ও বার্ষিক উৎসব' : 'Reunion & Annual Gathering'}
+                </a>
+              </li>
+              <li>
+                <a href="#executive-committee" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'কার্যনির্বাহী ও আহ্বায়ক কমিটি' : 'Executive & Convening Committee'}
+                </a>
+              </li>
+              <li>
+                <a href="#donation" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'অ্যালামনাই ডোনেশন ও তহবিল' : 'Alumni Donation & Funds'}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Col 3: Department Facilities */}
+          <div className="space-y-3.5">
+            <h4 className="font-bold text-amber-300 text-base sm:text-lg border-b border-emerald-800/80 pb-2 uppercase tracking-wide">
+              {language === 'bn' ? 'বিভাগীয় ঐতিহ্য ও সুবিধা' : 'Department & Heritage'}
+            </h4>
+            <ul className="space-y-2.5 text-gray-200 text-sm sm:text-[15px]">
+              <li>
+                <a href="#seminar-library" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'বিভাগীয় সেমিনার লাইব্রেরি' : 'Departmental Seminar Library'}
+                </a>
+              </li>
+              <li>
+                <a href="#smart-classroom" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'মাল্টিমিডিয়া ও স্মার্ট ক্লাসরুম' : 'Multimedia & Smart Classrooms'}
+                </a>
+              </li>
+              <li>
+                <a href="#botany-club" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'উদ্ভিদবিজ্ঞান ক্লাব ও রিসার্চ ফোরাম' : 'Botany Club & Research Forum'}
+                </a>
+              </li>
+              <li>
+                <a href="#study-tour" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'বার্ষিক শিক্ষা সফর ও ফিল্ড রিসার্চ' : 'Annual Study Tour & Fieldwork'}
+                </a>
+              </li>
+              <li>
+                <a href="#gallery" className="hover:text-amber-300 transition-colors flex items-center gap-2">
+                  <span className="text-amber-400 font-bold text-base">&rsaquo;</span>
+                  {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই ফটো গ্যালারি' : 'Botany Alumni Photo Gallery'}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Col 4: Contact & Department Office */}
+          <div className="space-y-3.5">
+            <h4 className="font-bold text-amber-300 text-base sm:text-lg border-b border-emerald-800/80 pb-2 uppercase tracking-wide">
+              {language === 'bn' ? 'যোগাযোগ' : 'Contact'}
+            </h4>
+            <div className="space-y-3 text-gray-200 text-sm sm:text-[15px]">
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="font-siliguri">
+                  {language === 'bn'
+                    ? 'জগন্নাথ বিশ্ববিদ্যালয়, ৯-১০ চিত্তরঞ্জন এভিনিউ, ঢাকা-১১০০।'
+                    : 'Jagannath University, 9-10 Chittaranjan Ave, Dhaka 1100.'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Mail className="w-5 h-5 text-emerald-400 shrink-0" />
+                <a href="mailto:baajnu@gmail.com" className="hover:text-amber-300 transition-colors">
+                  baajnu@gmail.com
+                </a>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Phone className="w-5 h-5 text-emerald-400 shrink-0" />
+                <a href="tel:+8801919107480" className="hover:text-amber-300 transition-colors font-mono font-semibold">
+                  +880 1919-107480
+                </a>
+              </div>
+              <div className="flex items-center gap-2.5 pt-1">
+                <Facebook className="w-5 h-5 text-blue-400 shrink-0" />
+                <a
+                  href="https://www.facebook.com/share/1HP68J9Fzp/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-300 font-bold hover:underline transition-colors text-xs sm:text-sm"
+                >
+                  {language === 'bn' ? 'অফিসিয়াল ফেসবুক পেজ / গ্রুপ' : 'Official Facebook Page / Group'}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom copyright line */}
+        <div className="bg-[#0b120f] py-3 px-3 sm:px-6 border-t border-emerald-950/80 text-gray-300 text-xs sm:text-sm">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+            <span className="tracking-normal font-medium">
+              {language === 'bn'
+                ? 'কপিরাইট © ২০২৬ সর্বস্বত্ব সংরক্ষিত - উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন'
+                : 'Copyright © 2026 All Rights Reserved - Botany Alumni Association'}
+            </span>
+            <span className="text-gray-300 font-medium flex items-center justify-center gap-1.5 text-xs sm:text-sm flex-wrap">
+              Developed by{' '}
+              <a
+                href="https://www.facebook.com/ishamimalmamun"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-300 font-bold hover:underline transition-colors"
+              >
+                Shamim Al Mamun
+              </a>{' '}
+              | CEO of{' '}
+              <a
+                href="https://xfixbd.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-300 font-bold hover:underline transition-colors"
+              >
+                xfixbd.com
+              </a>
+            </span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+};

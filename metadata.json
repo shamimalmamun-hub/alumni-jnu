@@ -1,0 +1,8 @@
+{
+  "name": "উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন",
+  "description": "উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয় - প্রাক্তন ও বর্তমান শিক্ষার্থীদের মেলবন্ধন ও অফিসিয়াল ওয়েবসাইট।",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
