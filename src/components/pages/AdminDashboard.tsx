@@ -606,13 +606,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let unsubNotices: () => void = () => {};
     let unsubNews: () => void = () => {};
 
-    // 0. Immediately load all memberships from Central Server Storage
+    // Initial load of server memberships
     loadServerMemberships().finally(() => setLoading(false));
-
-    // Continuous real-time auto-sync with Central Server API (so newly submitted applications appear instantly)
-    const syncInterval = setInterval(() => {
-      loadServerMemberships();
-    }, 4000);
 
     const handleStorageChange = () => {
       loadServerMemberships();
@@ -852,7 +847,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     return () => {
-      clearInterval(syncInterval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('alumni_membership_submitted', handleStorageChange);
       unsubMemberships();
