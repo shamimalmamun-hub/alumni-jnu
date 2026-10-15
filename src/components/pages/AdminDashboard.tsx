@@ -53,13 +53,12 @@ import {
   Award,
   Image as ImageIcon,
   Newspaper,
-  SlidersHorizontal,
-  RotateCcw
+  SlidersHorizontal
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { openNoticePdf } from '../../utils/noticePdfGenerator';
-import { getStoredNotices, publishNotice, removeNotice, saveStoredNotices, subscribeNotices } from '../../utils/noticeStore';
+import { publishNotice, removeNotice, subscribeNotices } from '../../utils/noticeStore';
 import { db, auth, googleProvider } from '../../lib/firebase';
 import { NEWS_POSTS, NewsPost } from '../../data/portalData';
 import {
@@ -112,19 +111,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     }
   } catch {
     errStr = String(error);
-  }
-
-  const isQuota =
-    (error as any)?.code === 'resource-exhausted' ||
-    errStr.includes('Quota limit exceeded') ||
-    errStr.includes('RESOURCE_EXHAUSTED') ||
-    errStr.includes('quota metric') ||
-    errStr.includes('free tier database') ||
-    errStr.includes('429');
-
-  if (isQuota) {
-    console.warn(`[Firestore Quota Notice] ${path || operationType}: Free tier read quota limit reached. Falling back to persistent server storage.`);
-    return;
   }
 
   const errInfo: FirestoreErrorInfo = {
@@ -340,132 +326,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, []);
 
   // Data states
-  const [memberships, setMemberships] = useState<MembershipRecord[]>(() => {
-    try {
-      const deletedIds = JSON.parse(localStorage.getItem('alumni_deleted_membership_ids') || '[]');
-      const saved = localStorage.getItem('alumni_submitted_memberships');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any old sample dummy items and deleted items
-          const clean = parsed.filter((m: any) => 
-            m.id !== 'MEM-1710000001' && m.id !== 'MEM-1710000002' && m.id !== 'MEM-1710000003' &&
-            !deletedIds.includes(m.id) && !deletedIds.includes(m.membershipId) && !deletedIds.includes(m.formNo)
-          );
-          return clean;
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [memberships, setMemberships] = useState<MembershipRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [feedbacks, setFeedbacks] = useState<FeedbackRecord[]>([]);
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
-  const [notices, setNotices] = useState<NoticeRecord[]>(() => getStoredNotices());
+  const [notices, setNotices] = useState<NoticeRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-
-  // Load memberships from central server API and merge with any existing/local state
-  const loadServerMemberships = async () => {
-    try {
-      const res = await fetch('/api/memberships');
-      if (res.ok) {
-        const data: MembershipRecord[] = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setMemberships((prev) => {
-            const map = new Map<string, MembershipRecord>();
-            data.forEach((m) => {
-              const k = m.id || m.membershipId || '';
-              if (k) map.set(k, m);
-            });
-            prev.forEach((m) => {
-              const k = m.id || m.membershipId || '';
-              if (k && !map.has(k)) map.set(k, m);
-            });
-            const list = Array.from(map.values());
-            list.sort((a, b) => {
-              const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return tB - tA;
-            });
-            return list;
-          });
-        }
-      }
-
-      // Also check if this browser or user has submitted memberships in localStorage
-      try {
-        const localRaw = localStorage.getItem('alumni_submitted_memberships');
-        if (localRaw) {
-          const localList = JSON.parse(localRaw);
-          if (Array.isArray(localList) && localList.length > 0) {
-            fetch('/api/memberships/sync-batch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ memberships: localList }),
-            }).catch(() => {});
-
-            setMemberships((prev) => {
-              const map = new Map<string, MembershipRecord>();
-              prev.forEach((m) => {
-                const k = m.id || m.membershipId || '';
-                if (k) map.set(k, m);
-              });
-              localList.forEach((m: any) => {
-                const k = m.id || m.membershipId || '';
-                if (k) {
-                  const existing = map.get(k);
-                  map.set(k, existing ? { ...m, ...existing } : m);
-                }
-              });
-              const list = Array.from(map.values());
-              list.sort((a, b) => {
-                const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                return tB - tA;
-              });
-              return list;
-            });
-          }
-        }
-      } catch (locErr) {}
-    } catch (err) {
-      console.warn('Server memberships load note:', err);
-    }
-
-    // 2. Also load server-persisted Feedback
-    try {
-      const fRes = await fetch('/api/feedback');
-      if (fRes.ok) {
-        const fList = await fRes.json();
-        if (Array.isArray(fList) && fList.length > 0) {
-          setFeedbacks(fList);
-        }
-      }
-    } catch (e) {}
-
-    // 3. Also load server-persisted Contacts
-    try {
-      const cRes = await fetch('/api/contacts');
-      if (cRes.ok) {
-        const cList = await cRes.json();
-        if (Array.isArray(cList) && cList.length > 0) {
-          setContacts(cList);
-        }
-      }
-    } catch (e) {}
-
-    // 4. Also load server-persisted Recent News
-    try {
-      const nRes = await fetch('/api/recent-news');
-      if (nRes.ok) {
-        const nList = await nRes.json();
-        if (Array.isArray(nList) && nList.length > 0) {
-          setRecentNewsItems(nList);
-        }
-      }
-    } catch (e) {}
-  };
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -606,17 +472,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let unsubNotices: () => void = () => {};
     let unsubNews: () => void = () => {};
 
-    // Initial load of server memberships
-    loadServerMemberships().finally(() => setLoading(false));
-
-    const handleStorageChange = () => {
-      loadServerMemberships();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('alumni_membership_submitted', handleStorageChange);
-
     try {
-      // 1. Memberships Real-time Listener (with server sync & quota fault-tolerance)
+      // 1. Memberships real-time listener
       const memQuery = query(collection(db, 'memberships'));
       unsubMemberships = onSnapshot(memQuery, (snapshot) => {
         const list: MembershipRecord[] = [];
@@ -687,34 +544,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           });
         });
 
-        if (list.length > 0) {
-          // Sync Firestore snapshot to Central Server Storage
-          fetch('/api/memberships/sync-batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ memberships: list }),
-          }).catch(() => {});
-
-          setMemberships((prev) => {
-            const map = new Map<string, MembershipRecord>();
-            list.forEach((m) => map.set(m.id || m.membershipId || '', m));
-            prev.forEach((m) => {
-              const k = m.id || m.membershipId || '';
-              if (k && !map.has(k)) map.set(k, m);
-            });
-            const merged = Array.from(map.values());
-            merged.sort((a, b) => {
-              const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return tB - tA;
-            });
-            return merged;
-          });
-        }
+        list.sort((x, y) => {
+          const tX = x.createdAt ? new Date(x.createdAt).getTime() : 0;
+          const tY = y.createdAt ? new Date(y.createdAt).getTime() : 0;
+          return tY - tX;
+        });
+        setMemberships(list);
         setLoading(false);
       }, (error: any) => {
-        console.warn('Firestore memberships listener note (relying on central server storage):', error?.message || error);
-        loadServerMemberships();
+        handleFirestoreError(error, OperationType.LIST, 'memberships');
         setLoading(false);
       });
 
@@ -733,9 +571,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setFeedbacks(list);
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'feedback_messages');
-        fetch('/api/feedback').then(r => r.json()).then(list => {
-          if (Array.isArray(list) && list.length > 0) setFeedbacks(list);
-        }).catch(() => {});
       });
 
       // 3. Contacts
@@ -753,9 +588,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setContacts(list);
       }, (error) => {
         handleFirestoreError(error, OperationType.LIST, 'contacts');
-        fetch('/api/contacts').then(r => r.json()).then(list => {
-          if (Array.isArray(list) && list.length > 0) setContacts(list);
-        }).catch(() => {});
       });
 
       // 4. Notices (resilient subscription with guaranteed 35 baseline notices)
@@ -799,12 +631,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setPayments(list);
       }, (error) => {
         console.warn('Payments listener info (using server storage):', error);
-        fetch('/api/payments').then(r => r.json()).then(list => {
-          if (Array.isArray(list) && list.length > 0) setPayments(list);
-        }).catch(() => {});
       });
 
-      // 6. Recent News with limit(20) and quota error handling
+      // 6. Recent News
       const newsQuery = query(collection(db, 'recent_news'), limit(20));
       unsubNews = onSnapshot(newsQuery, (snapshot) => {
         const list: NewsPost[] = [];
@@ -831,15 +660,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         });
         setRecentNewsItems(list);
       }, (error) => {
-        const isQuota = error?.code === 'resource-exhausted' || error?.message?.includes('quota') || error?.message?.includes('exceeded');
-        if (isQuota) {
-          console.warn('Firestore recent_news quota limit exceeded. Falling back to server & local storage cache.');
-        } else {
-          handleFirestoreError(error, OperationType.LIST, 'recent_news');
-        }
-        fetch('/api/recent-news').then(r => r.json()).then(list => {
-          if (Array.isArray(list) && list.length > 0) setRecentNewsItems(list);
-        }).catch(() => {});
+        handleFirestoreError(error, OperationType.LIST, 'recent_news');
       });
     } catch (e) {
       console.error(e);
@@ -847,8 +668,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('alumni_membership_submitted', handleStorageChange);
       unsubMemberships();
       unsubPayments();
       unsubFeedbacks();
@@ -886,39 +705,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         updates.paymentStatus = 'unpaid';
       }
 
-      // 1. Immediately persist to Central Server API
-      try {
-        await fetch(`/api/memberships/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        });
-      } catch (apiErr) {
-        console.warn('Server API status update warning:', apiErr);
-      }
-
-      // 2. Also update Firestore & localStorage
-      try {
-        await setDoc(doc(db, 'memberships', id), updates, { merge: true });
-      } catch (fsErr) {
-        console.warn('Firestore update warning (server storage updated):', fsErr);
-      }
-
-      try {
-        const localRaw = localStorage.getItem('alumni_submitted_memberships');
-        if (localRaw) {
-          const localList = JSON.parse(localRaw);
-          const updatedLocal = localList.map((m: any) =>
-            (m.id === id || m.membershipId === id) ? { ...m, ...updates } : m
-          );
-          localStorage.setItem('alumni_submitted_memberships', JSON.stringify(updatedLocal));
-        }
-      } catch (e) {}
-
-      // Instantly update local state so user sees item transition immediately
-      setMemberships((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
-      );
+      await updateDoc(doc(db, 'memberships', id), updates);
 
       if (selectedMember && selectedMember.id === id) {
         setSelectedMember({ ...selectedMember, ...updates });
@@ -1385,33 +1172,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!memberToDelete) return;
     setIsDeleting(true);
     try {
-      try {
-        await fetch(`/api/memberships/${encodeURIComponent(memberToDelete.id)}`, { method: 'DELETE' });
-      } catch (apiErr) {}
-      try {
-        await deleteDoc(doc(db, 'memberships', memberToDelete.id));
-      } catch (fsErr) {}
-
-      // Update localStorage backup so deleted items never come back on reload
-      try {
-        const deletedIds = JSON.parse(localStorage.getItem('alumni_deleted_membership_ids') || '[]');
-        deletedIds.push(memberToDelete.id);
-        if (memberToDelete.formNo) deletedIds.push(memberToDelete.formNo);
-        localStorage.setItem('alumni_deleted_membership_ids', JSON.stringify(deletedIds));
-
-        const localRaw = localStorage.getItem('alumni_submitted_memberships');
-        if (localRaw) {
-          const localList = JSON.parse(localRaw);
-          const filtered = localList.filter((m: any) => m.id !== memberToDelete.id && m.membershipId !== memberToDelete.id && m.formNo !== memberToDelete.formNo);
-          localStorage.setItem('alumni_submitted_memberships', JSON.stringify(filtered));
-        }
-      } catch (e) {}
+      await deleteDoc(doc(db, 'memberships', memberToDelete.id));
 
       if (selectedMember?.id === memberToDelete.id) {
         setSelectedMember(null);
       }
       setSelectedMemberIds((prev) => prev.filter((id) => id !== memberToDelete.id));
-      setMemberships((prev) => prev.filter((m) => m.id !== memberToDelete.id && m.membershipId !== memberToDelete.id && m.formNo !== memberToDelete.formNo));
       showToast(language === 'bn' ? `"${memberToDelete.name}"-এর সদস্যপদ সফলভাবে মুছে ফেলা হয়েছে।` : 'Member deleted successfully.');
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `memberships/${memberToDelete.id}`);
@@ -1445,33 +1211,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsDeleting(true);
     try {
       const idsToDelete = [...selectedMemberIds];
-      await Promise.allSettled(
-        idsToDelete.map((id) => fetch(`/api/memberships/${encodeURIComponent(id)}`, { method: 'DELETE' }))
-      );
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         idsToDelete.map((id) => deleteDoc(doc(db, 'memberships', id)))
       );
-
-      // Update localStorage backup
-      try {
-        const deletedIds = JSON.parse(localStorage.getItem('alumni_deleted_membership_ids') || '[]');
-        idsToDelete.forEach(id => deletedIds.push(id));
-        localStorage.setItem('alumni_deleted_membership_ids', JSON.stringify(deletedIds));
-
-        const localRaw = localStorage.getItem('alumni_submitted_memberships');
-        if (localRaw) {
-          const localList = JSON.parse(localRaw);
-          const filtered = localList.filter((m: any) => !idsToDelete.includes(m.id) && !idsToDelete.includes(m.membershipId || '') && !idsToDelete.includes(m.formNo || ''));
-          localStorage.setItem('alumni_submitted_memberships', JSON.stringify(filtered));
-        }
-      } catch (e) {}
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) throw new Error(`${failed} of ${idsToDelete.length} deletions failed`);
 
       if (selectedMember && idsToDelete.includes(selectedMember.id)) {
         setSelectedMember(null);
       }
       const count = idsToDelete.length;
       setSelectedMemberIds([]);
-      setMemberships((prev) => prev.filter((m) => !idsToDelete.includes(m.id) && !idsToDelete.includes(m.membershipId || '') && !idsToDelete.includes(m.formNo || '')));
       setBulkDeleteModalOpen(false);
       showToast(
         language === 'bn'
@@ -1492,12 +1242,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Update Contact Status
   const handleUpdateContactStatus = async (id: string, newStatus: 'unread' | 'read' | 'resolved') => {
-    fetch(`/api/contacts/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    }).catch(() => {});
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)));
     try {
       await updateDoc(doc(db, 'contacts', id), {
         status: newStatus
@@ -1514,8 +1258,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Delete Contact
   const handleDeleteContact = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'বার্তাটি মুছে ফেলতে চান?' : 'Delete this message?')) return;
-    fetch(`/api/contacts/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-    setContacts((prev) => prev.filter((c) => c.id !== id));
     try {
       await deleteDoc(doc(db, 'contacts', id));
       if (selectedContact?.id === id) setSelectedContact(null);
@@ -1527,12 +1269,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Update Feedback/Advice Status
   const handleUpdateFeedbackStatus = async (id: string, newStatus: 'unread' | 'read' | 'resolved') => {
-    fetch(`/api/feedback/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    }).catch(() => {});
-    setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, status: newStatus } : f)));
     try {
       await updateDoc(doc(db, 'feedback_messages', id), {
         status: newStatus
@@ -1549,8 +1285,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Delete Feedback/Advice
   const handleDeleteFeedback = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'পরামর্শ ও মতামত বার্তাটি মুছে ফেলতে চান?' : 'Delete this feedback message?')) return;
-    fetch(`/api/feedback/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-    setFeedbacks((prev) => prev.filter((f) => f.id !== id));
     try {
       await deleteDoc(doc(db, 'feedback_messages', id));
       if (selectedFeedback?.id === id) setSelectedFeedback(null);
@@ -1617,7 +1351,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const formattedDate = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getFullYear()}`;
 
     try {
-      const created = await publishNotice({
+      await publishNotice({
         id: noticeId,
         title: newNoticeData.title,
         category: newNoticeData.category,
@@ -1628,7 +1362,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         pdfUrl: newNoticeData.pdfUrl || '',
         pdfFileName: newNoticeData.pdfFileName || ''
       });
-      setNotices((prev) => [created, ...prev.filter((n) => n.id !== created.id)]);
       setNewNoticeModal(false);
       setNewNoticeData({
         title: '',
@@ -1641,7 +1374,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       showToast(language === 'bn' ? 'নতুন নোটিশ সফলভাবে প্রকাশিত ও সংরক্ষিত হয়েছে!' : 'Notice published and saved successfully!');
     } catch (err: any) {
-      console.warn('Notice creation fallback error:', err);
+      console.error('Notice creation failed:', err);
       showToast(language === 'bn' ? 'নোটিশ স্থানীয় ক্যাশে সংরক্ষিত হয়েছে!' : 'Notice saved in local storage!');
     }
   };
@@ -1651,7 +1384,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!window.confirm(language === 'bn' ? 'নোটিশটি মুছে ফেলতে চান?' : 'Delete notice?')) return;
     try {
       await removeNotice(id);
-      setNotices((prev) => prev.filter((n) => n.id !== id));
       showToast(language === 'bn' ? 'নোটিশ মুছে ফেলা হয়েছে।' : 'Notice deleted.');
     } catch (err: any) {
       console.warn('Notice deletion warning:', err);
@@ -1770,22 +1502,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       createdAt: new Date().toISOString()
     };
 
-    fetch('/api/recent-news', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newsRecord),
-    }).catch(() => {});
-
-    setRecentNewsItems((prev) => {
-      const idx = prev.findIndex((p) => p.id === newsId);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = { ...copy[idx], ...newsRecord };
-        return copy;
-      }
-      return [newsRecord, ...prev];
-    });
-
     try {
       await setDoc(doc(db, 'recent_news', newsId), newsRecord, { merge: true });
 
@@ -1803,8 +1519,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDeleteNews = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'আপনি কি এই খবরটি মুছে ফেলতে চান?' : 'Are you sure to delete this news post?')) return;
-    fetch(`/api/recent-news/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-    setRecentNewsItems((prev) => prev.filter((p) => p.id !== id));
     try {
       await deleteDoc(doc(db, 'recent_news', id));
       showToast(language === 'bn' ? 'খবরটি মুছে ফেলা হয়েছে।' : 'News post deleted.');
@@ -1998,41 +1712,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     });
 
-    // Check localStorage backup
-    try {
-      const raw = localStorage.getItem('alumni_submitted_payments');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        parsed.forEach((p: any) => {
-          if (
-            (p.purposeType === 'donation' || (p.purpose && p.purpose.includes('ডোনেশন'))) &&
-            !combined.some((c) => c.id === p.id || (p.transactionId && c.transactionId === p.transactionId))
-          ) {
-            combined.push({
-              id: p.id || `local-${Date.now()}`,
-              receiptNo: p.receiptNo || `BAAJNU-DON-${Math.floor(1000 + Math.random() * 9000)}`,
-              payerName: p.payerName || 'Anonymous Donor',
-              payerNameBn: p.payerNameBn || p.payerName || 'অজ্ঞাতনামা দাতা',
-              membershipId: p.membershipId || '',
-              purpose: p.purpose || 'অ্যালামনাই অ্যাসোসিয়েশনে ডোনেশন',
-              purposeType: 'donation',
-              amount: Number(p.amount) || 0,
-              paymentMethod: p.paymentMethod || 'bKash',
-              senderNumber: p.senderNumber || '',
-              transactionId: p.transactionId || '',
-              phone: p.phone || '',
-              email: p.email || '',
-              session: p.session || '',
-              batch: p.batch || '',
-              note: p.note || '',
-              status: p.status || 'verified',
-              createdAt: p.createdAt || '',
-            });
-          }
-        });
-      }
-    } catch {}
-
     // Sort newest first
     combined.sort((a, b) => {
       const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -2128,23 +1807,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         createdAt: now,
       };
 
-      // Save to Firestore
-      try {
-        await setDoc(doc(db, 'payments', docId), newRec);
-      } catch (fsErr) {
-        console.warn('Firestore donation save fallback:', fsErr);
-      }
-
-      // Save to localStorage fallback
-      try {
-        const raw = localStorage.getItem('alumni_submitted_payments') || '[]';
-        const parsed = JSON.parse(raw);
-        parsed.unshift(newRec);
-        localStorage.setItem('alumni_submitted_payments', JSON.stringify(parsed.slice(0, 100)));
-      } catch {}
-
-      // Update state locally for instant UI response
-      setPayments((prev) => [newRec, ...prev]);
+      await setDoc(doc(db, 'payments', docId), newRec);
 
       setIsAddDonationModalOpen(false);
       setNewDonationData({
@@ -2174,15 +1837,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
     try {
-      if (!donationId.startsWith('mem-') && !donationId.startsWith('local-')) {
+      if (!donationId.startsWith('mem-')) {
         await deleteDoc(doc(db, 'payments', donationId));
       }
-      setPayments((prev) => prev.filter((p) => p.id !== donationId));
-      try {
-        const raw = localStorage.getItem('alumni_submitted_payments') || '[]';
-        const parsed = JSON.parse(raw).filter((p: any) => p.id !== donationId);
-        localStorage.setItem('alumni_submitted_payments', JSON.stringify(parsed));
-      } catch {}
       if (selectedDonation?.id === donationId) {
         setSelectedDonation(null);
       }
@@ -2461,18 +2118,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Quick Right Actions */}
           <div className="flex items-center flex-wrap gap-2">
-            <button
-              onClick={() => {
-                setRefreshing(true);
-                setTimeout(() => setRefreshing(false), 600);
-                showToast(language === 'bn' ? 'ডাটা সফলভাবে রিফ্রেশ করা হয়েছে।' : 'Data refreshed.');
-              }}
-              className="px-3 py-1.5 bg-emerald-800/90 hover:bg-emerald-700 text-emerald-100 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border border-emerald-600/40"
-              title={language === 'bn' ? 'রিফ্রেশ করুন' : 'Refresh'}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{language === 'bn' ? 'রিফ্রেশ' : 'Refresh'}</span>
-            </button>
 
             <button
               onClick={onBackToHome}
@@ -4622,26 +4267,6 @@ ${sMessage}`;
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/notices');
-                      if (res.ok) {
-                        const data = await res.json();
-                        setNotices(data);
-                        showToast(language === 'bn' ? 'সার্ভার থেকে নোটিশ রিফ্রেশ করা হয়েছে!' : 'Notices refreshed from server!');
-                      }
-                    } catch (e) {
-                      showToast(language === 'bn' ? 'রিফ্রেশ ব্যর্থ হয়েছে' : 'Refresh failed');
-                    }
-                  }}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? 'রিফ্রেশ' : 'Refresh'}</span>
-                </button>
-
                 <button
                   onClick={() => setNewNoticeModal(true)}
                   className="px-4 py-2.5 bg-[#006a4e] hover:bg-[#00523d] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"

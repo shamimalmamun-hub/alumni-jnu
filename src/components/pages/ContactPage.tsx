@@ -3,78 +3,6 @@ import { MapPin, Phone, Mail, Send, ArrowLeft, CheckCircle2, GraduationCap, Buil
 import { db, auth } from '../../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  };
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  let errStr = '';
-  try {
-    if (error instanceof Error) {
-      errStr = error.message;
-    } else if (typeof error === 'object' && error !== null) {
-      errStr = (error as any).message || (error as any).error || JSON.stringify(error);
-    } else {
-      errStr = String(error);
-    }
-  } catch {
-    errStr = String(error);
-  }
-
-  const isQuota =
-    (error as any)?.code === 'resource-exhausted' ||
-    errStr.includes('Quota limit exceeded') ||
-    errStr.includes('RESOURCE_EXHAUSTED') ||
-    errStr.includes('quota metric') ||
-    errStr.includes('free tier database') ||
-    errStr.includes('429');
-
-  if (isQuota) {
-    console.warn(`[Firestore Quota Notice] ${path || operationType}: Quota cooling down. Using server API.`);
-    return;
-  }
-
-  const errInfo: FirestoreErrorInfo = {
-    error: errStr,
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-}
-
 interface ContactPageProps {
   language: 'bn' | 'en';
   onBackToHome: () => void;
@@ -98,39 +26,21 @@ export const ContactPage: React.FC<ContactPageProps> = ({ language, onBackToHome
     }
 
     const contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    const path = `contacts/${contactId}`;
-
-    const contactPayload = {
-      id: contactId,
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      subject: formData.subject,
-      message: formData.message,
-      status: 'unread',
-      createdAt: new Date().toISOString()
-    };
 
     try {
-      fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactPayload),
-      }).catch(() => {});
-
       await setDoc(doc(db, 'contacts', contactId), {
         name: formData.name,
         phone: formData.phone,
         email: formData.email,
         subject: formData.subject,
         message: formData.message,
+        status: 'unread',
         createdAt: new Date().toISOString()
       });
       setSubmitted(true);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
-      // Since contact was posted to server, still show submitted
-      setSubmitted(true);
+      console.error('Contact submission failed:', error);
+      alert(language === 'bn' ? 'বার্তা পাঠানো যায়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।' : 'Could not send your message. Please check your connection and try again.');
     }
   };
 

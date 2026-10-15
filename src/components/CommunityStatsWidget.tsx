@@ -24,7 +24,6 @@ interface CommunityStatsWidgetProps {
   onNavigateToDonation?: () => void;
 }
 
-const LOCAL_STORAGE_KEY = 'baajnu_community_stats';
 
 export const DEFAULT_MANUAL_STATS: CommunityStatsData = {
   mode: 'manual',
@@ -45,91 +44,19 @@ export const CommunityStatsWidget: React.FC<CommunityStatsWidgetProps> = ({
   onNavigateToLeadership,
   onNavigateToDonation,
 }) => {
-  // Admin custom manual settings state (Auto-Sync completely turned off)
-  const [adminStats, setAdminStats] = useState<CommunityStatsData>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...DEFAULT_MANUAL_STATS, ...parsed, mode: 'manual' };
-      }
-    } catch (e) {
-      console.warn('Error reading community stats from localStorage:', e);
-    }
-    return DEFAULT_MANUAL_STATS;
-  });
+  // Admin-managed numbers, live from Firestore `site_settings/community_stats`
+  const [adminStats, setAdminStats] = useState<CommunityStatsData>(DEFAULT_MANUAL_STATS);
 
   useEffect(() => {
-    // 1. Fetch persistent server settings in background (strictly manual)
-    const fetchApiStats = async () => {
-      try {
-        const res = await fetch('/api/community-stats');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && typeof data === 'object') {
-            const merged = { ...DEFAULT_MANUAL_STATS, ...data, mode: 'manual' as const };
-            setAdminStats(merged);
-            try {
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-            } catch (err) {
-              console.warn('localStorage save warning:', err);
-            }
-          }
+    return onSnapshot(
+      doc(db, 'site_settings', 'community_stats'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setAdminStats({ ...DEFAULT_MANUAL_STATS, ...(docSnap.data() as CommunityStatsData), mode: 'manual' as const });
         }
-      } catch (err) {
-        console.warn('Server community stats fetch error:', err);
-      }
-    };
-    fetchApiStats();
-
-    // 2. Listen to custom window update event from Admin dashboard
-    const handleLocalUpdate = (event: Event) => {
-      const customEvt = event as CustomEvent<CommunityStatsData>;
-      if (customEvt.detail) {
-        const merged = { ...DEFAULT_MANUAL_STATS, ...customEvt.detail, mode: 'manual' as const };
-        setAdminStats(merged);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-        } catch (e) {
-          console.warn('localStorage save warning:', e);
-        }
-      }
-    };
-    window.addEventListener('community-stats-updated', handleLocalUpdate);
-
-    // 3. Listen to single doc settings in Firestore (if available & quota permits)
-    let unsubscribeAdmin = () => {};
-    try {
-      const settingsDocRef = doc(db, 'site_settings', 'community_stats');
-      unsubscribeAdmin = onSnapshot(
-        settingsDocRef,
-        (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data() as CommunityStatsData;
-            const merged = { ...DEFAULT_MANUAL_STATS, ...data, mode: 'manual' as const };
-            setAdminStats(merged);
-            try {
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-            } catch (e) {
-              console.warn('localStorage save warning:', e);
-            }
-          }
-        },
-        (err) => {
-          console.warn('Community stats Firestore settings notice (using manual cache):', err);
-        }
-      );
-    } catch (e) {
-      console.warn('Error setting up admin stats doc listener:', e);
-    }
-
-    // Notice: Auto-listeners for memberships and payments are completely removed as requested
-    // (Auto Sync is OFF, this is now strictly manual).
-
-    return () => {
-      window.removeEventListener('community-stats-updated', handleLocalUpdate);
-      unsubscribeAdmin();
-    };
+      },
+      (err) => console.warn('Community stats listener error:', err)
+    );
   }, []);
 
   const toBnNumber = (val: number | string) => {

@@ -9,70 +9,24 @@ interface CommunityStatsAdminEditorProps {
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-const LOCAL_STORAGE_KEY = 'baajnu_community_stats';
-
 export const CommunityStatsAdminEditor: React.FC<CommunityStatsAdminEditorProps> = ({
   language,
   onShowToast,
 }) => {
-  const [formData, setFormData] = useState<CommunityStatsData>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        return { ...DEFAULT_MANUAL_STATS, ...JSON.parse(saved), mode: 'manual' };
-      }
-    } catch (e) {
-      console.warn('localStorage error:', e);
-    }
-    return DEFAULT_MANUAL_STATS;
-  });
+  const [formData, setFormData] = useState<CommunityStatsData>(DEFAULT_MANUAL_STATS);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setLoading(true);
-        // 1. Try server API
-        try {
-          const apiRes = await fetch('/api/community-stats');
-          if (apiRes.ok) {
-            const apiData = await apiRes.json();
-            if (apiData && typeof apiData === 'object') {
-              const merged = { ...DEFAULT_MANUAL_STATS, ...apiData, mode: 'manual' as const };
-              setFormData(merged);
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-            }
-          }
-        } catch (apiErr) {
-          console.warn('Could not fetch /api/community-stats:', apiErr);
+    getDoc(doc(db, 'site_settings', 'community_stats'))
+      .then((snap) => {
+        if (snap.exists()) {
+          setFormData({ ...DEFAULT_MANUAL_STATS, ...(snap.data() as CommunityStatsData), mode: 'manual' });
         }
-
-        // 2. Try Firestore doc
-        try {
-          const docRef = doc(db, 'site_settings', 'community_stats');
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            const data = snap.data() as CommunityStatsData;
-            const merged = {
-              ...DEFAULT_MANUAL_STATS,
-              ...data,
-              mode: 'manual' as const,
-            };
-            setFormData(merged);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
-          }
-        } catch (firestoreErr) {
-          console.warn('Could not fetch Firestore community stats:', firestoreErr);
-        }
-      } catch (err) {
-        console.error('Error fetching community stats settings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSettings();
+      })
+      .catch((err) => console.error('Error fetching community stats settings:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e?: React.FormEvent) => {
@@ -84,39 +38,11 @@ export const CommunityStatsAdminEditor: React.FC<CommunityStatsAdminEditorProps>
         mode: 'manual', // Strictly manual - Auto Sync turned off
       };
 
-      // 1. Save to local storage
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-      } catch (e) {
-        console.warn('localStorage save warning:', e);
-      }
-
-      // 2. Broadcast window event for immediate UI update without refresh
-      window.dispatchEvent(
-        new CustomEvent('community-stats-updated', { detail: payload })
-      );
-
-      // 3. Save to server persistent API
-      try {
-        await fetch('/api/community-stats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } catch (apiErr) {
-        console.warn('Server API save warning:', apiErr);
-      }
-
-      // 4. Save to Firestore
-      try {
-        const docRef = doc(db, 'site_settings', 'community_stats');
-        await setDoc(docRef, {
-          ...payload,
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-      } catch (fireErr: any) {
-        console.warn('Firestore doc save warning (saved locally & on server):', fireErr);
-      }
+      // Written once to Firestore; every open page receives it through its live listener.
+      await setDoc(doc(db, 'site_settings', 'community_stats'), {
+        ...payload,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
 
       setSaveSuccess(true);
       onShowToast(

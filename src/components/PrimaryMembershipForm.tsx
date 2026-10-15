@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import { db } from '../lib/firebase';
-import { doc, getDocs, collection } from 'firebase/firestore';
-import { saveDocWithRetry, updateDocWithRetry } from '../lib/firestoreSync';
+import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { BATCH_SESSION_LIST } from '../data/batchSessionData';
 import {
   MembershipPaymentSection,
@@ -545,40 +544,9 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      // 1. Local storage & session storage backup for immediate retrieval
-      try {
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_memberships') || '[]');
-        localList.unshift(payload);
-        localStorage.setItem('alumni_submitted_memberships', JSON.stringify(localList.slice(0, 50)));
-        sessionStorage.setItem('current_member_application', JSON.stringify(payload));
-        window.dispatchEvent(new Event('alumni_membership_submitted'));
-      } catch (e) {
-        console.warn('LocalStorage backup error:', e);
-      }
+      await setDoc(doc(db, 'memberships', uniqueSubmissionId), payload);
 
-      // 3. Guaranteed sync to Central Server API & Firestore before navigation
-      try {
-        await fetch('/api/memberships', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        });
-      } catch {
-        try {
-          navigator.sendBeacon('/api/memberships', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-        } catch {}
-      }
-
-      const savedToCentralDb = await saveDocWithRetry(doc(db, 'memberships', uniqueSubmissionId), payload);
-      if (!savedToCentralDb) {
-        const msg = language === 'bn'
-          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে আবেদন সংরক্ষণ ব্যর্থ হয়েছে! পেমেন্টের পরে অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন.'
-          : 'Warning: Failed to save your application to the central database! After payment, please check your internet connection and try again.';
-        alert(msg);
-      }
-
-      // 4. Navigate to payment page
+      // Navigate to payment page
       if (onNavigateToPayment) {
         onNavigateToPayment(uniqueSubmissionId, formData.membershipType);
       } else {
@@ -590,39 +558,9 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       }
     } catch (err: any) {
       console.error('Error saving application prior to payment:', err);
-      // Fallback save to localStorage and server API
-      try {
-        const fallbackPayload = {
-          membershipId: formData.membershipId,
-          formNo: formData.membershipId,
-          applicantNameEn: formData.nameEnglish,
-          applicantNameBn: formData.nameBangla || formData.nameEnglish,
-          fullName: formData.nameEnglish,
-          phone: formData.phone,
-          email: formData.email,
-          membershipType: formData.membershipType || 'general',
-          feeAmount: formData.membershipType === 'life' ? '২৫০০' : '৫০০',
-          paymentStatus: 'pending',
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        };
-        fetch('/api/memberships', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: formData.membershipId, ...fallbackPayload }),
-        }).catch(() => {});
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_memberships') || '[]');
-        localList.unshift({ id: formData.membershipId, ...fallbackPayload });
-        localStorage.setItem('alumni_submitted_memberships', JSON.stringify(localList.slice(0, 50)));
-        sessionStorage.setItem('current_member_application', JSON.stringify(fallbackPayload));
-      } catch (e) {
-        console.warn('Fallback storage error:', e);
-      }
-      if (onNavigateToPayment) {
-        onNavigateToPayment(formData.membershipId, formData.membershipType);
-      } else {
-        window.location.href = `/payment?id=${formData.membershipId}&type=${formData.membershipType}`;
-      }
+      alert(language === 'bn'
+        ? 'আবেদন সংরক্ষণে সমস্যা হয়েছে। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।'
+        : 'Could not save your application. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -710,52 +648,20 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      // 1. Immediately persist to Central Server API (100% reliable, never blocked by quota)
-      let serverSaved = false;
-      try {
-        const res = await fetch('/api/memberships', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: membershipDocId, ...payload }),
-        });
-        if (res.ok) serverSaved = true;
-      } catch (apiErr) {
-        console.warn('Central server save notice:', apiErr);
-      }
+      await setDoc(doc(db, 'memberships', membershipDocId), payload);
 
-      // Also persist payment to central server if provided
+      // Record the payment itself in the `payments` collection
       if (payData && payData.paymentMethod && payData.paymentMethod !== 'Unpaid') {
-        try {
-          await fetch('/api/payments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              membershipId: membershipDocId,
-              applicantName: formData.nameEnglish || formData.nameBangla,
-              phone: formData.phone,
-              ...payData,
-              createdAt: new Date().toISOString(),
-            }),
-          });
-        } catch (pErr) {}
-      }
-
-      // 2. Also save to Firestore with backward-compatible aliases and payment details
-      const fsSaved = await saveDocWithRetry(doc(db, 'memberships', membershipDocId), payload);
-      if (!fsSaved) {
-        const msg = language === 'bn'
-          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে তথ্য সংরক্ষণ ব্যর্থ হয়েছে! অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করুন.'
-          : 'Warning: Failed to save to the central database! Please check your internet connection.';
-        alert(msg);
-      }
-
-      // Local storage backup for offline/fast card generation
-      try {
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_memberships') || '[]');
-        localList.unshift({ id: membershipDocId, ...payload });
-        localStorage.setItem('alumni_submitted_memberships', JSON.stringify(localList.slice(0, 50)));
-      } catch (e) {
-        console.warn('LocalStorage backup error:', e);
+        const paymentId = `PAY-${Date.now()}`;
+        const paymentRecord = JSON.parse(JSON.stringify({
+          id: paymentId,
+          membershipId: membershipDocId,
+          applicantName: formData.nameEnglish || formData.nameBangla,
+          phone: formData.phone,
+          ...payData,
+          createdAt: new Date().toISOString(),
+        }));
+        await setDoc(doc(db, 'payments', paymentId), paymentRecord);
       }
 
       setPaymentInfo(payData);
@@ -768,39 +674,9 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Error submitting form & payment:', err);
-      // Fallback save to localStorage and server API so user never loses application
-      try {
-        const fallbackPayload = {
-          membershipId: formData.membershipId,
-          formNo: formData.membershipId,
-          applicantNameEn: formData.nameEnglish,
-          applicantNameBn: formData.nameBangla || formData.nameEnglish,
-          fullName: formData.nameEnglish,
-          membershipType: payData.membershipType || formData.membershipType || 'general',
-          feeAmount: payData.feeAmount || (formData.membershipType === 'life' ? '২৫০০' : '৫০০'),
-          paymentMethod: payData.paymentMethod,
-          senderNumber: payData.senderNumber,
-          transactionId: payData.transactionId,
-          paymentStatus: 'pending',
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        };
-        fetch('/api/memberships', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: membershipDocId, ...fallbackPayload }),
-          keepalive: true,
-        }).catch(() => {});
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_memberships') || '[]');
-        localList.unshift({ id: membershipDocId, ...fallbackPayload });
-        localStorage.setItem('alumni_submitted_memberships', JSON.stringify(localList.slice(0, 50)));
-      } catch {}
-
-      // If server or local storage succeeded, still proceed to success
-      setPaymentInfo(payData);
-      setSubmitted(true);
-      setStep('success');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      alert(language === 'bn'
+        ? 'আবেদন সংরক্ষণে সমস্যা হয়েছে। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।'
+        : 'Could not save your application. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }

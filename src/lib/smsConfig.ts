@@ -107,9 +107,6 @@ export const SMS_PRESET_TEMPLATES: SMSPreset[] = [
   },
 ];
 
-const LOCAL_STORAGE_KEY = 'botany_alumni_sms_template';
-const LOCAL_STORAGE_ENABLED_KEY = 'botany_alumni_sms_enabled';
-
 export interface SMSConfigData {
   template: string;
   enabled: boolean;
@@ -194,20 +191,12 @@ export function formatCustomSMS(
  * Check whether SMS sending is globally ON or OFF
  */
 export async function isSMSEnabled(): Promise<boolean> {
-  if (typeof window !== 'undefined') {
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_ENABLED_KEY);
-      if (cached !== null) {
-        return cached === 'true';
-      }
-    } catch {}
-  }
   const config = await loadSavedSMSConfig();
   return config.enabled;
 }
 
 /**
- * Load full saved SMS config (template + ON/OFF status) from Firestore (with localStorage fallback)
+ * Load full saved SMS config (template + ON/OFF status) from Firestore
  */
 export async function loadSavedSMSConfig(): Promise<SMSConfigData> {
   let template = DEFAULT_SMS_TEMPLATE;
@@ -229,40 +218,18 @@ export async function loadSavedSMSConfig(): Promise<SMSConfigData> {
           enabled = data.smsEnabled;
         }
 
-        // Cache locally
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, template);
-            localStorage.setItem(LOCAL_STORAGE_ENABLED_KEY, String(enabled));
-          } catch {}
-        }
         return { template, enabled };
       }
     }
   } catch (err) {
-    console.warn('[SMSConfig] Firestore read failed, reading from localStorage:', err);
-  }
-
-  // Fallback to localStorage
-  if (typeof window !== 'undefined') {
-    try {
-      const cachedTpl = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (cachedTpl && cachedTpl.trim()) {
-        const cleaned = stripCardLinkFromTemplate(cachedTpl.trim());
-        template = cleaned || DEFAULT_SMS_TEMPLATE;
-      }
-      const cachedEnabled = localStorage.getItem(LOCAL_STORAGE_ENABLED_KEY);
-      if (cachedEnabled !== null) {
-        enabled = cachedEnabled === 'true';
-      }
-    } catch {}
+    console.warn('[SMSConfig] Firestore read failed, using defaults:', err);
   }
 
   return { template, enabled };
 }
 
 /**
- * Load saved SMS template from Firestore (with localStorage fallback)
+ * Load saved SMS template from Firestore
  */
 export async function loadSavedSMSTemplate(): Promise<string> {
   const config = await loadSavedSMSConfig();
@@ -270,7 +237,7 @@ export async function loadSavedSMSTemplate(): Promise<string> {
 }
 
 /**
- * Save full SMS configuration (template & ON/OFF state) to Firestore and local storage
+ * Save full SMS configuration (template & ON/OFF state) to Firestore
  */
 export async function saveSMSFullConfig(
   config: { template: string; enabled: boolean },
@@ -279,15 +246,6 @@ export async function saveSMSFullConfig(
   const cleanTemplate = config.template.trim() || DEFAULT_SMS_TEMPLATE;
   const isEnabled = Boolean(config.enabled);
 
-  // 1. Save to localStorage immediately
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, cleanTemplate);
-      localStorage.setItem(LOCAL_STORAGE_ENABLED_KEY, String(isEnabled));
-    } catch {}
-  }
-
-  // 2. Persist to Firestore
   try {
     const docRef = doc(db, 'settings', 'sms_config');
     await setDoc(
@@ -309,7 +267,7 @@ export async function saveSMSFullConfig(
 }
 
 /**
- * Save SMS template to Firestore and local storage
+ * Save SMS template to Firestore
  */
 export async function saveSMSTemplate(
   template: string,

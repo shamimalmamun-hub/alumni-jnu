@@ -26,12 +26,13 @@ import {
   Info,
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { saveDocWithRetry, updateDocWithRetry } from '../../lib/firestoreSync';
 import {
   collection,
   doc,
   getDoc,
   getDocs,
+  setDoc,
+  updateDoc,
   query,
   where,
 } from 'firebase/firestore';
@@ -256,48 +257,6 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
   }, [initialMembershipId, initialFeeType]);
 
   const lookupMemberInfo = async (id: string) => {
-    // 1. Try checking sessionStorage first (instant for freshly submitted forms)
-    try {
-      const sessionRaw = sessionStorage.getItem('current_member_application');
-      if (sessionRaw) {
-        const data = JSON.parse(sessionRaw);
-        if (data.membershipId === id || data.formNo === id || !id) {
-          if (data.nameEnglish || data.fullName) setPayerName(data.nameEnglish || data.fullName);
-          if (data.nameBangla || data.applicantNameBn) setPayerNameBn(data.nameBangla || data.applicantNameBn);
-          if (data.phone || data.mobile) setPhone(data.phone || data.mobile);
-          if (data.email) setEmail(data.email);
-          if (data.bscSession || data.session) setSession(data.bscSession || data.session);
-          if (data.bscBatch || data.batch) setBatch(data.bscBatch || data.batch);
-          if (data.membershipType) setPurposeType(data.membershipType);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    // 2. Try checking localStorage backup
-    try {
-      const localListRaw = localStorage.getItem('alumni_submitted_memberships');
-      if (localListRaw) {
-        const list = JSON.parse(localListRaw);
-        const match = list.find((m: any) => m.membershipId === id || m.formNo === id || m.id === id);
-        if (match) {
-          if (match.applicantNameEn || match.nameEnglish || match.fullName) {
-            setPayerName(match.applicantNameEn || match.nameEnglish || match.fullName);
-          }
-          if (match.applicantNameBn || match.nameBangla) {
-            setPayerNameBn(match.applicantNameBn || match.nameBangla);
-          }
-          if (match.phone || match.mobile) setPhone(match.phone || match.mobile);
-          if (match.email) setEmail(match.email);
-          if (match.bscSession || match.session) setSession(match.bscSession || match.session);
-          if (match.bscBatch || match.batch) setBatch(match.bscBatch || match.batch);
-          if (match.membershipType) setPurposeType(match.membershipType);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    // 3. Fallback to Firestore lookup
     try {
       const docRef = doc(db, 'memberships', id);
       const snap = await getDoc(docRef);
@@ -418,71 +377,24 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
         }
       });
 
-      // 2. Persist to Central Server API (Payments & Memberships)
-      try {
-        await fetch('/api/payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newRecord),
-        });
-        if (membershipId.trim()) {
-          await fetch(`/api/memberships/${encodeURIComponent(membershipId.trim())}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              paymentStatus: 'paid',
-              paymentMethod,
-              senderNumber: senderNumber.trim(),
-              transactionId: transactionId.trim().toUpperCase(),
-              paymentReceiptNo: receiptNo,
-              paidAmount: amount,
-              paidAt: now,
-            }),
+      // Save to `payments` collection in Firestore
+      await setDoc(doc(db, 'payments', paymentDocId), firestoreRecord);
+
+      // If membershipId provided, mark the membership as paid in Firestore
+      if (membershipId.trim()) {
+        const memRef = doc(db, 'memberships', membershipId.trim());
+        const memSnap = await getDoc(memRef);
+        if (memSnap.exists()) {
+          await updateDoc(memRef, {
+            paymentStatus: 'paid',
+            paymentMethod,
+            senderNumber: senderNumber.trim(),
+            transactionId: transactionId.trim().toUpperCase(),
+            paymentReceiptNo: receiptNo,
+            paidAmount: amount,
+            paidAt: now,
           });
         }
-      } catch (apiErr) {
-        console.warn('Central server payment sync warning:', apiErr);
-      }
-
-      // 3. Save to `payments` collection in Firestore safely
-      const paymentSaved = await saveDocWithRetry(doc(db, 'payments', paymentDocId), firestoreRecord);
-      if (!paymentSaved) {
-        setErrorMessage(language === 'bn'
-          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে পেমেন্ট তথ্য সংরক্ষণ ব্যর্থ হয়েছে! ইন্টারনেট সংযোগ পরীক্ষা করে ডাউনলোড/প্রিন্ট করা রশিদ সংরক্ষণ করুন.আবার পেমেন্ট সাবমিট করবেন না।'
-          : 'Warning: Failed to save payment info to the central database! Check your connection and keep the downloaded/printed receipt. Do not submit payment again.');
-      }
-
-      // 4. If membershipId provided, update the membership record in Firestore
-      if (membershipId.trim()) {
-        try {
-          const memRef = doc(db, 'memberships', membershipId.trim());
-          const memSnap = await getDoc(memRef);
-          if (memSnap.exists()) {
-            const membershipPaid = await updateDocWithRetry(memRef, {
-              paymentStatus: 'paid',
-              paymentMethod,
-              senderNumber: senderNumber.trim(),
-              transactionId: transactionId.trim().toUpperCase(),
-              paymentReceiptNo: receiptNo,
-              paidAmount: amount,
-              paidAt: now,
-            });
-            if (!membershipPaid) {
-              console.warn('Membership payment-status update failed after retries; local receipt still generated.');
-            }
-          }
-        } catch (memErr) {
-          console.warn('Membership status update warning:', memErr);
-        }
-      }
-
-      // 4. Save to localStorage backup
-      try {
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_payments') || '[]');
-        localList.unshift(newRecord);
-        localStorage.setItem('alumni_submitted_payments', JSON.stringify(localList.slice(0, 50)));
-      } catch (e) {
-        console.warn('LocalStorage payment backup error:', e);
       }
 
       setCreatedReceipt(newRecord);
@@ -490,39 +402,10 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Payment submission handler error:', err);
-      // Fallback: still generate receipt so user is never blocked
-      const amount = getEffectiveAmount();
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const receiptNo = `BAAJNU-PAY-${randomSuffix}`;
-      const paymentDocId = `PAY-${Date.now()}-${randomSuffix}`;
-      const now = new Date().toISOString();
-      const finalPayerName = payerName.trim() || membershipId.trim() || 'Alumni Member';
-      const fallbackRecord: PaymentRecord = {
-        id: paymentDocId,
-        receiptNo,
-        payerName: finalPayerName,
-        payerNameBn: payerNameBn.trim() || finalPayerName,
-        membershipId: membershipId.trim() || undefined,
-        purpose: getPurposeTitle(),
-        purposeType,
-        amount,
-        paymentMethod,
-        senderNumber: senderNumber.trim(),
-        transactionId: transactionId.trim().toUpperCase(),
-        phone: phone.trim() || senderNumber.trim(),
-        status: 'verified',
-        createdAt: now,
-      };
-
-      try {
-        const localList = JSON.parse(localStorage.getItem('alumni_submitted_payments') || '[]');
-        localList.unshift(fallbackRecord);
-        localStorage.setItem('alumni_submitted_payments', JSON.stringify(localList.slice(0, 50)));
-      } catch (e) {}
-
-      setCreatedReceipt(fallbackRecord);
+      setErrorMessage(language === 'bn'
+        ? 'পেমেন্ট তথ্য সংরক্ষণ করা যায়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।'
+        : 'Could not save your payment. Please check your connection and try again.');
       setIsSubmitting(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 

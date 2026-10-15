@@ -184,40 +184,6 @@ export default function App() {
             if (snap && !snap.empty) {
               const matchedDoc = snap.docs[0];
               setDirectPdfMember({ id: matchedDoc.id, ...(matchedDoc.data() as any) });
-            } else {
-              // Try finding in central server storage
-              let serverMatch = null;
-              try {
-                const sRes = await fetch('/api/memberships');
-                if (sRes.ok) {
-                  const sList = await sRes.json();
-                  serverMatch = (sList || []).find((m: any) =>
-                    m.id === formKey ||
-                    m.membershipId === formKey ||
-                    m.formNo === formKey ||
-                    m.formNo?.toUpperCase() === formKey.toUpperCase() ||
-                    m.transactionId === formKey ||
-                    m.phone === formKey ||
-                    m.mobile === formKey
-                  );
-                }
-              } catch (sErr) {}
-
-              if (serverMatch) {
-                setDirectPdfMember(serverMatch);
-              } else {
-                setDirectPdfMember({
-                  formNo: formKey,
-                  applicantNameBn: 'সম্মানিত সদস্য',
-                  applicantNameEn: 'Distinguished Member',
-                  fullName: 'সম্মানিত সদস্য',
-                  session: '২০০৫-২০০৬',
-                  mobile: '০১৭১২৩৪৫৬৭৮',
-                  status: 'approved',
-                  paymentStatus: 'paid',
-                  transactionId: 'VERIFIED',
-                });
-              }
             }
           }
         } catch (e) {
@@ -254,40 +220,6 @@ export default function App() {
             if (snap && !snap.empty) {
               const matchedDoc = snap.docs[0];
               setDirectCardMember({ id: matchedDoc.id, ...(matchedDoc.data() as any) });
-            } else {
-              // Try finding in central server storage
-              let serverMatch = null;
-              try {
-                const sRes = await fetch('/api/memberships');
-                if (sRes.ok) {
-                  const sList = await sRes.json();
-                  serverMatch = (sList || []).find((m: any) =>
-                    m.id === cardKey ||
-                    m.membershipId === cardKey ||
-                    m.formNo === cardKey ||
-                    m.formNo?.toUpperCase() === cardKey.toUpperCase() ||
-                    m.transactionId === cardKey ||
-                    m.phone === cardKey ||
-                    m.mobile === cardKey
-                  );
-                }
-              } catch (sErr) {}
-
-              if (serverMatch) {
-                setDirectCardMember(serverMatch);
-              } else {
-                // Fallback preview
-                setDirectCardMember({
-                  formNo: cardKey,
-                  applicantNameBn: 'সম্মানিত সদস্য',
-                  fullName: 'সম্মানিত সদস্য',
-                  session: '২০২০-২০২১',
-                  program: 'bsc_honours',
-                  mobile: '০১৭১২৩৪৫৬৭৮',
-                  currentAddress: 'জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা',
-                  transactionId: 'VERIFIED',
-                });
-              }
             }
           }
         } catch (e) {

@@ -34,21 +34,11 @@ export const RecentNewsSlider: React.FC<RecentNewsSliderProps> = ({
   const [selectedNews, setSelectedNews] = useState<NewsPost | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [firestorePosts, setFirestorePosts] = useState<NewsPost[]>([]);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Subscribe to Firestore recent_news & Server storage with limit and quota error handling
+  // Live subscription to Firestore recent_news
   useEffect(() => {
     let unsubscribe = () => {};
-
-    fetch('/api/recent-news')
-      .then((res) => res.json())
-      .then((list) => {
-        if (Array.isArray(list) && list.length > 0) {
-          setFirestorePosts(list);
-        }
-      })
-      .catch(() => {});
 
     try {
       const q = query(collection(db, 'recent_news'), limit(15));
@@ -78,18 +68,10 @@ export const RecentNewsSlider: React.FC<RecentNewsSliderProps> = ({
             });
           });
 
-          if (list.length > 0) {
-            setFirestorePosts(list);
-          }
+          setFirestorePosts(list);
         },
         (err) => {
-          const isQuota = err?.code === 'resource-exhausted' || err?.message?.includes('quota') || err?.message?.includes('exceeded');
-          if (isQuota) {
-            setQuotaExceeded(true);
-            console.warn('Firestore recent_news quota limit exceeded. Falling back to server & local storage cache.');
-          } else {
-            console.warn('Firestore recent_news error:', err);
-          }
+          console.warn('Firestore recent_news error:', err);
         }
       );
     } catch (err) {

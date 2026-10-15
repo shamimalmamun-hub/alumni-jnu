@@ -3,7 +3,6 @@
  * Works across:
  * 1. Node/Express backend (/api/send-sms)
  * 2. Cloudflare Pages & Workers (/api/send-sms)
- * 3. Direct Static Fallback
  */
 
 import { isSMSEnabled } from './smsConfig';
@@ -70,7 +69,6 @@ export async function dispatchPaymentSMS({
 
   console.log(`[SMS Service] Attempting SMS dispatch to ${cleanNumber}... Message: ${messageText}`);
 
-  // 1. Try Backend / Cloudflare Function endpoint first
   try {
     const res = await fetch('/api/send-sms', {
       method: 'POST',
@@ -86,47 +84,13 @@ export async function dispatchPaymentSMS({
         message: messageText,
       }),
     });
-
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      if (data && (data.success || data.status === 'SUCCESS')) {
-        console.log('[SMS Service] SMS successfully sent via API route:', data);
-        return { success: true, data };
-      }
-    } else {
-      console.warn(`[SMS Service] API route returned status ${res.status}, evaluating fallback...`);
+    const data = await res.json().catch(() => null);
+    if (res.ok && data && (data.success || data.status === 'SUCCESS')) {
+      return { success: true, data };
     }
-  } catch (err) {
-    console.warn('[SMS Service] API route fetch failed:', err);
-  }
-
-  // 2. Direct Fallback if static host has no /api/send-sms backend
-  try {
-    const apiKey = 'juOIwULseyuzv3Z9AUKk';
-    const senderId = '8809648906169';
-    const hasUnicode = /[^\u0000-\u007F]/.test(messageText);
-    const smsType = hasUnicode ? 'unicode' : 'text';
-
-    const params = new URLSearchParams({
-      api_key: apiKey,
-      type: smsType,
-      number: cleanNumber,
-      message: messageText,
-      senderid: senderId,
-    });
-
-    const directUrl = `https://bulksmsbd.net/api/smsapi?${params.toString()}`;
-    
-    // Use no-cors mode or standard fetch so browser doesn't block
-    await fetch(directUrl, {
-      method: 'GET',
-      mode: 'no-cors',
-    }).catch(() => null);
-
-    console.log('[SMS Service] Direct SMS request dispatched to BulkSMSBD gateway.');
-    return { success: true, data: { mode: 'direct_dispatched' } };
-  } catch (fallbackErr: any) {
-    console.error('[SMS Service] Direct dispatch failed:', fallbackErr);
-    return { success: false, error: fallbackErr?.message };
+    return { success: false, error: data?.error || `SMS API returned status ${res.status}` };
+  } catch (err: any) {
+    console.error('[SMS Service] dispatch failed:', err);
+    return { success: false, error: err?.message };
   }
 }

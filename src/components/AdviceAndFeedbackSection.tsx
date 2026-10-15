@@ -102,24 +102,7 @@ export const AdviceAndFeedbackSection: React.FC<AdviceAndFeedbackSectionProps> =
     }
 
     setIsSubmitting(true);
-    const feedbackPayload = {
-      senderName: senderName.trim(),
-      senderBatch: senderBatch.trim(),
-      senderContact: senderContact.trim(),
-      category,
-      subject: subject.trim(),
-      message: message.trim(),
-      createdAt: new Date().toISOString(),
-      status: 'unread'
-    };
-
     try {
-      fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(feedbackPayload),
-      }).catch(() => {});
-
       await addDoc(collection(db, 'feedback_messages'), {
         senderName: senderName.trim(),
         senderBatch: senderBatch.trim(),
@@ -130,10 +113,6 @@ export const AdviceAndFeedbackSection: React.FC<AdviceAndFeedbackSectionProps> =
         createdAt: serverTimestamp(),
         status: 'unread'
       });
-    } catch (err) {
-      console.warn('Firestore submission notice (server storage saved):', err);
-    } finally {
-      setIsSubmitting(false);
       setSubmitSuccess(true);
       setSenderName('');
       setSenderBatch('');
@@ -141,6 +120,11 @@ export const AdviceAndFeedbackSection: React.FC<AdviceAndFeedbackSectionProps> =
       setSubject('');
       setMessage('');
       setTimeout(() => setSubmitSuccess(false), 7000);
+    } catch (err) {
+      console.error('Feedback submission failed:', err);
+      alert(language === 'bn' ? 'বার্তা পাঠানো যায়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।' : 'Could not send your message. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
