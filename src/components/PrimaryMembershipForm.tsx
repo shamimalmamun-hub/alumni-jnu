@@ -555,27 +555,37 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         console.warn('LocalStorage backup error:', e);
       }
 
-      // 3. Guaranteed sync to Central Server API before navigation (with timeout)
+      // 3. Guaranteed sync to Central Server API & Firestore before navigation
       try {
         await Promise.race([
-          fetch('/api/memberships', {
+          Promise.all([
+            fetch('/api/memberships', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              keepalive: true,
+            }),
+            setDoc(doc(db, 'memberships', uniqueSubmissionId), payload).catch((fsErr) => {
+              console.warn('Firestore write warning (server API active):', fsErr);
+            })
+          ]),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+        ]);
+      } catch (e) {
+        console.warn('Primary sync timeout/error, executing guaranteed server sync fallback:', e);
+        try {
+          await fetch('/api/memberships', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-        ]);
-      } catch (e) {
-        // Fallback sendBeacon / keepalive fetch if timeout or network hiccup
-        try {
-          navigator.sendBeacon('/api/memberships', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-        } catch (err) {}
+            keepalive: true,
+          });
+        } catch (err) {
+          try {
+            navigator.sendBeacon('/api/memberships', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+          } catch (beaconErr) {}
+        }
       }
-
-      // Try saving to Firestore in background
-      setDoc(doc(db, 'memberships', uniqueSubmissionId), payload).catch((fsErr) => {
-        console.warn('Firestore background write notice:', fsErr);
-      });
 
       // 4. Navigate to payment page
       if (onNavigateToPayment) {
