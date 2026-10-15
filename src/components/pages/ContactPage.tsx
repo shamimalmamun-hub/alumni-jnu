@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Send, ArrowLeft, CheckCircle2, GraduationCap, Building } from 'lucide-react';
-import { db, auth } from '../../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { setDocument } from '../../lib/db';
 
 interface ContactPageProps {
   language: 'bn' | 'en';
@@ -28,7 +27,7 @@ export const ContactPage: React.FC<ContactPageProps> = ({ language, onBackToHome
     const contactId = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
     try {
-      await setDoc(doc(db, 'contacts', contactId), {
+      await setDocument('contacts', contactId, {
         name: formData.name,
         phone: formData.phone,
         email: formData.email,

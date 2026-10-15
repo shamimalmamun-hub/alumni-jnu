@@ -25,17 +25,7 @@ import {
   BookOpen,
   Info,
 } from 'lucide-react';
-import { db } from '../../lib/firebase';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  query,
-  where,
-} from 'firebase/firestore';
+import { ApiError, getDocument, listDocuments, setDocument, updateDocument } from '../../lib/db';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import jnuBotanyLogo from '../../assets/images/jnu_botany_alumni_logo.jpg';
@@ -259,10 +249,8 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
 
   const lookupMemberInfo = async (id: string) => {
     try {
-      const docRef = doc(db, 'memberships', id);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
+      const data = await getDocument('memberships', id);
+      if (data) {
         if (data.nameEnglish || data.fullName || data.applicantNameEn) {
           setPayerName(data.nameEnglish || data.fullName || data.applicantNameEn);
         }
@@ -370,23 +358,21 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
         createdAt: now,
       };
 
-      // 1. Prepare clean record for Firestore without `undefined` fields
-      const firestoreRecord: Record<string, any> = {};
+      // 1. Prepare clean record for the database without `undefined` fields
+      const paymentRecord: Record<string, any> = {};
       Object.entries(newRecord).forEach(([key, val]) => {
         if (val !== undefined) {
-          firestoreRecord[key] = val;
+          paymentRecord[key] = val;
         }
       });
 
-      // Save to `payments` collection in Firestore
-      await setDoc(doc(db, 'payments', paymentDocId), firestoreRecord);
+      // Save to `payments` collection
+      await setDocument('payments', paymentDocId, paymentRecord);
 
-      // If membershipId provided, mark the membership as paid in Firestore
+      // If membershipId provided, mark the membership as paid
       if (membershipId.trim()) {
-        const memRef = doc(db, 'memberships', membershipId.trim());
-        const memSnap = await getDoc(memRef);
-        if (memSnap.exists()) {
-          await updateDoc(memRef, {
+        try {
+          await updateDocument('memberships', membershipId.trim(), {
             paymentStatus: 'paid',
             paymentMethod,
             senderNumber: senderNumber.trim(),
@@ -395,6 +381,9 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
             paidAmount: amount,
             paidAt: now,
           });
+        } catch (err) {
+          // No membership with that id: the payment is still recorded.
+          if (!(err instanceof ApiError && err.status === 404)) throw err;
         }
       }
 
@@ -422,41 +411,27 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
     setSearchResult(null);
 
     try {
-      const colRef = collection(db, 'payments');
+      const findOne = async (collection: string, where: Record<string, string>) =>
+        (await listDocuments<any>(collection, { where, limit: 1 }))[0];
 
-      // 1. Try by Transaction ID
-      let snap = await getDocs(query(colRef, where('transactionId', '==', q.toUpperCase())));
-      if (snap.empty) {
-        snap = await getDocs(query(colRef, where('transactionId', '==', q)));
-      }
-
-      // 2. Try by Receipt No
-      if (snap.empty) {
-        snap = await getDocs(query(colRef, where('receiptNo', '==', q.toUpperCase())));
-      }
-
-      // 3. Try by Membership ID
-      if (snap.empty) {
-        snap = await getDocs(query(colRef, where('membershipId', '==', q)));
-      }
-
-      // 4. Try by Phone
-      if (snap.empty) {
-        snap = await getDocs(query(colRef, where('phone', '==', q)));
-      }
+      // 1-4. Try by Transaction ID, Receipt No, Membership ID, then Phone
+      const found =
+        (await findOne('payments', { transactionId: q.toUpperCase() })) ||
+        (await findOne('payments', { transactionId: q })) ||
+        (await findOne('payments', { receiptNo: q.toUpperCase() })) ||
+        (await findOne('payments', { membershipId: q })) ||
+        (await findOne('payments', { phone: q }));
 
       // 5. If still not found, check memberships collection for paid record
-      if (snap.empty) {
-        const memRef = collection(db, 'memberships');
-        let memSnap = await getDocs(query(memRef, where('transactionId', '==', q.toUpperCase())));
-        if (memSnap.empty) {
-          memSnap = await getDocs(query(memRef, where('formNo', '==', q)));
-        }
+      if (!found) {
+        const memDoc =
+          (await findOne('memberships', { transactionId: q.toUpperCase() })) ||
+          (await findOne('memberships', { formNo: q }));
 
-        if (!memSnap.empty) {
-          const memData = memSnap.docs[0].data();
+        if (memDoc) {
+          const memData = memDoc;
           const synthesized: PaymentRecord = {
-            id: memSnap.docs[0].id,
+            id: memDoc.id,
             receiptNo: memData.paymentReceiptNo || `BAAJNU-REC-${memData.formNo || 'VERIFIED'}`,
             payerName: memData.nameEnglish || memData.fullName || 'Alumni Member',
             payerNameBn: memData.nameBangla || memData.applicantNameBn || 'অ্যালামনাই সদস্য',
@@ -478,9 +453,8 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
         }
       }
 
-      if (!snap.empty) {
-        const docData = snap.docs[0].data() as PaymentRecord;
-        setSearchResult({ ...docData, id: snap.docs[0].id });
+      if (found) {
+        setSearchResult(found as PaymentRecord);
       } else {
         setSearchError(
           language === 'bn'

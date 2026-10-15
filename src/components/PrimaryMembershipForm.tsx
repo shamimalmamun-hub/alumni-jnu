@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fileToDataUrl, optimizeImage, uploadToCloudinary } from '../lib/cloudinary';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
-import { db } from '../lib/firebase';
-import { doc, getDocs, collection, setDoc } from 'firebase/firestore';
+import { setDocument } from '../lib/db';
 import { BATCH_SESSION_LIST } from '../data/batchSessionData';
 import {
   MembershipPaymentSection,
@@ -505,7 +504,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'memberships', uniqueSubmissionId), payload);
+      await setDocument('memberships', uniqueSubmissionId, payload);
 
       // Navigate to payment page
       if (onNavigateToPayment) {
@@ -609,7 +608,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'memberships', membershipDocId), payload);
+      await setDocument('memberships', membershipDocId, payload);
 
       // Record the payment itself in the `payments` collection
       if (payData && payData.paymentMethod && payData.paymentMethod !== 'Unpaid') {
@@ -622,7 +621,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
           ...payData,
           createdAt: new Date().toISOString(),
         }));
-        await setDoc(doc(db, 'payments', paymentId), paymentRecord);
+        await setDocument('payments', paymentId, paymentRecord);
       }
 
       setPaymentInfo(payData);

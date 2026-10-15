@@ -59,20 +59,9 @@ import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { openNoticePdf } from '../../utils/noticePdfGenerator';
 import { publishNotice, removeNotice, subscribeNotices } from '../../utils/noticeStore';
-import { db, auth, googleProvider } from '../../lib/firebase';
+import { auth, googleProvider } from '../../lib/firebase';
 import { NEWS_POSTS, NewsPost } from '../../data/portalData';
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  limit
-} from 'firebase/firestore';
+import { deleteDocument, listDocuments, setDocument, setPinToken, loginWithPin, updateDocument, watch } from '../../lib/db';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { BATCH_SESSION_LIST } from '../../data/batchSessionData';
 import { EmailTemplateSettings } from '../admin/EmailTemplateSettings';
@@ -121,7 +110,26 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error in Admin Dashboard: ', JSON.stringify(errInfo));
+  console.error('Database error in Admin Dashboard: ', JSON.stringify(errInfo));
+}
+
+/**
+ * Load a whole collection and hand it to `onData` in the shape the list builders below expect
+ * (`forEach` over `{ id, data() }`). Re-runs after this browser writes to the collection.
+ */
+function watchCollection(
+  name: string,
+  onData: (snapshot: { forEach: (fn: (docSnap: { id: string; data: () => any }) => void) => void }) => void,
+  onError: (error: unknown) => void
+) {
+  return watch(name, async () => {
+    try {
+      const docs = await listDocuments(name);
+      onData({ forEach: (fn) => docs.forEach((d) => fn({ id: d.id, data: () => d })) });
+    } catch (err) {
+      onError(err);
+    }
+  });
 }
 
 export interface MembershipRecord {
@@ -402,10 +410,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Check PIN or Auth
-  const handlePinLogin = (e: React.FormEvent) => {
+  const handlePinLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const pin = adminPin.trim();
-    if (pin === 'baajnu2024@botany') {
+    let ok = false;
+    try {
+      ok = await loginWithPin(pin);
+    } catch (err) {
+      console.error('Admin login request failed:', err);
+    }
+    if (ok) {
       setIsAuthenticated(true);
       const user = { name: 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাডমিন সেল', email: 'admin@botany-alumni.org' };
       setAdminUser(user);
@@ -414,7 +428,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setAuthError('');
       showToast(language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাডমিন প্যানেলে স্বাগতম!' : 'Welcome to Botany Alumni Admin Panel!');
     } else {
-      setAuthError(language === 'bn' ? 'ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।' : 'Incorrect password! Please try again.');
+      setAuthError(language === 'bn' ? 'ভুল পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।' : 'Incorrect password! Please try again.');
     }
   };
 
@@ -445,11 +459,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     sessionStorage.removeItem('botany_admin_user');
     sessionStorage.removeItem('soc_admin_auth');
     sessionStorage.removeItem('soc_admin_user');
+    setPinToken(null);
     signOut(auth).catch(() => {});
     showToast(language === 'bn' ? 'লগআউট সম্পন্ন হয়েছে।' : 'Logged out.');
   };
 
-  // Real-time data fetch from Firestore
+  // The Worker rejected our admin token (expired PIN session, or Google account not on the allowlist)
+  useEffect(() => {
+    const onExpired = () => {
+      if (!isAuthenticated) return;
+      handleLogout();
+      setAuthError(
+        language === 'bn'
+          ? 'সেশন শেষ হয়েছে বা এই অ্যাকাউন্টের অ্যাডমিন অ্যাক্সেস নেই। আবার লগইন করুন।'
+          : 'Session expired or this account has no admin access. Please sign in again.'
+      );
+    };
+    window.addEventListener('admin-auth-expired', onExpired);
+    return () => window.removeEventListener('admin-auth-expired', onExpired);
+  }, [isAuthenticated, language]);
+
+  // Load dashboard data from D1 (refetched after each local write)
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -463,8 +493,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     try {
       // 1. Memberships real-time listener
-      const memQuery = query(collection(db, 'memberships'));
-      unsubMemberships = onSnapshot(memQuery, (snapshot) => {
+      unsubMemberships = watchCollection('memberships', (snapshot) => {
         const list: MembershipRecord[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data() as any;
@@ -546,8 +575,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
 
       // 2. Feedback & Advice from Homepage
-      const feedQuery = query(collection(db, 'feedback_messages'));
-      unsubFeedbacks = onSnapshot(feedQuery, (snapshot) => {
+      unsubFeedbacks = watchCollection('feedback_messages', (snapshot) => {
         const list: FeedbackRecord[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ id: docSnap.id, ...docSnap.data() } as FeedbackRecord);
@@ -563,8 +591,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
 
       // 3. Contacts
-      const contQuery = query(collection(db, 'contacts'));
-      unsubContacts = onSnapshot(contQuery, (snapshot) => {
+      unsubContacts = watchCollection('contacts', (snapshot) => {
         const list: ContactRecord[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ id: docSnap.id, ...docSnap.data() } as ContactRecord);
@@ -585,8 +612,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
 
       // 5. Payments & Donations
-      const payQuery = query(collection(db, 'payments'));
-      unsubPayments = onSnapshot(payQuery, (snapshot) => {
+      unsubPayments = watchCollection('payments', (snapshot) => {
         const list: PaymentRecord[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data() as any;
@@ -619,12 +645,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         });
         setPayments(list);
       }, (error) => {
-        console.warn('Payments listener info (using server storage):', error);
+        console.warn('Payments load failed:', error);
       });
 
       // 6. Recent News
-      const newsQuery = query(collection(db, 'recent_news'), limit(20));
-      unsubNews = onSnapshot(newsQuery, (snapshot) => {
+      unsubNews = watchCollection('recent_news', (snapshot) => {
         const list: NewsPost[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data() as any;
@@ -694,7 +719,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         updates.paymentStatus = 'unpaid';
       }
 
-      await updateDoc(doc(db, 'memberships', id), updates);
+      await updateDocument('memberships', id, updates);
 
       if (selectedMember && selectedMember.id === id) {
         setSelectedMember({ ...selectedMember, ...updates });
@@ -1076,7 +1101,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!memberToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, 'memberships', memberToDelete.id));
+      await deleteDocument('memberships', memberToDelete.id);
 
       if (selectedMember?.id === memberToDelete.id) {
         setSelectedMember(null);
@@ -1116,7 +1141,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       const idsToDelete = [...selectedMemberIds];
       const results = await Promise.allSettled(
-        idsToDelete.map((id) => deleteDoc(doc(db, 'memberships', id)))
+        idsToDelete.map((id) => deleteDocument('memberships', id))
       );
       const failed = results.filter((r) => r.status === 'rejected').length;
       if (failed > 0) throw new Error(`${failed} of ${idsToDelete.length} deletions failed`);
@@ -1147,7 +1172,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Update Contact Status
   const handleUpdateContactStatus = async (id: string, newStatus: 'unread' | 'read' | 'resolved') => {
     try {
-      await updateDoc(doc(db, 'contacts', id), {
+      await updateDocument('contacts', id, {
         status: newStatus
       });
       if (selectedContact && selectedContact.id === id) {
@@ -1163,7 +1188,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteContact = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'বার্তাটি মুছে ফেলতে চান?' : 'Delete this message?')) return;
     try {
-      await deleteDoc(doc(db, 'contacts', id));
+      await deleteDocument('contacts', id);
       if (selectedContact?.id === id) setSelectedContact(null);
       showToast(language === 'bn' ? 'বার্তা মুছে ফেলা হয়েছে।' : 'Message deleted.');
     } catch (err) {
@@ -1174,7 +1199,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Update Feedback/Advice Status
   const handleUpdateFeedbackStatus = async (id: string, newStatus: 'unread' | 'read' | 'resolved') => {
     try {
-      await updateDoc(doc(db, 'feedback_messages', id), {
+      await updateDocument('feedback_messages', id, {
         status: newStatus
       });
       if (selectedFeedback && selectedFeedback.id === id) {
@@ -1190,7 +1215,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteFeedback = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'পরামর্শ ও মতামত বার্তাটি মুছে ফেলতে চান?' : 'Delete this feedback message?')) return;
     try {
-      await deleteDoc(doc(db, 'feedback_messages', id));
+      await deleteDocument('feedback_messages', id);
       if (selectedFeedback?.id === id) setSelectedFeedback(null);
       showToast(language === 'bn' ? 'পরামর্শ বার্তা মুছে ফেলা হয়েছে।' : 'Feedback message deleted.');
     } catch (err) {
@@ -1366,7 +1391,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
 
     try {
-      await setDoc(doc(db, 'recent_news', newsId), newsRecord, { merge: true });
+      await setDocument('recent_news', newsId, newsRecord, { merge: true });
 
       setNewNewsModalOpen(false);
       showToast(
@@ -1383,7 +1408,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteNews = async (id: string) => {
     if (!window.confirm(language === 'bn' ? 'আপনি কি এই খবরটি মুছে ফেলতে চান?' : 'Are you sure to delete this news post?')) return;
     try {
-      await deleteDoc(doc(db, 'recent_news', id));
+      await deleteDocument('recent_news', id);
       showToast(language === 'bn' ? 'খবরটি মুছে ফেলা হয়েছে।' : 'News post deleted.');
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `recent_news/${id}`);
@@ -1394,7 +1419,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!window.confirm(language === 'bn' ? 'ডিফল্ট খবরগুলো ডেটাবেজে যুক্ত করতে চান?' : 'Populate default news to database?')) return;
     try {
       for (const item of NEWS_POSTS) {
-        await setDoc(doc(db, 'recent_news', item.id), {
+        await setDocument('recent_news', item.id, {
           titleBn: item.titleBn,
           titleEn: item.titleEn,
           categoryBn: item.categoryBn,
@@ -1670,7 +1695,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         createdAt: now,
       };
 
-      await setDoc(doc(db, 'payments', docId), newRec);
+      await setDocument('payments', docId, newRec);
 
       setIsAddDonationModalOpen(false);
       setNewDonationData({
@@ -1701,7 +1726,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     try {
       if (!donationId.startsWith('mem-')) {
-        await deleteDoc(doc(db, 'payments', donationId));
+        await deleteDocument('payments', donationId);
       }
       if (selectedDonation?.id === donationId) {
         setSelectedDonation(null);

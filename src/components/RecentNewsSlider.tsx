@@ -12,8 +12,7 @@ import {
   User
 } from 'lucide-react';
 import { NEWS_POSTS, NewsPost } from '../data/portalData';
-import { db } from '../lib/firebase';
-import { collection, onSnapshot, query, limit } from 'firebase/firestore';
+import { listDocuments, watch } from '../lib/db';
 
 interface RecentNewsSliderProps {
   language: 'bn' | 'en';
@@ -33,57 +32,37 @@ export const RecentNewsSlider: React.FC<RecentNewsSliderProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [selectedNews, setSelectedNews] = useState<NewsPost | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [firestorePosts, setFirestorePosts] = useState<NewsPost[]>([]);
+  const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Live subscription to Firestore recent_news
+  // Load recent_news from D1 (refetched after local admin edits)
   useEffect(() => {
-    let unsubscribe = () => {};
-
-    try {
-      const q = query(collection(db, 'recent_news'), limit(15));
-      unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const list: NewsPost[] = [];
-          snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            list.push({
-              id: docSnap.id,
-              titleBn: data.titleBn || '',
-              titleEn: data.titleEn || data.titleBn || '',
-              category: data.category || 'academic',
-              categoryBn: data.categoryBn || 'সাধারণ খবরাখবর',
-              categoryEn: data.categoryEn || 'General News',
-              imageUrl: data.imageUrl || 'https://media.istockphoto.com/id/2022468311/vector/single-man-stick-figure-icon.jpg?s=1024x1024&w=is&k=20&c=knHDGHH3klSPlNHLoqfsFcAkVJc78KuABkT5lVLCXco=',
-              date: data.date || '',
-              authorBn: data.authorBn || '',
-              authorEn: data.authorEn || '',
-              summaryBn: data.summaryBn || '',
-              summaryEn: data.summaryEn || data.summaryBn || '',
-              contentBn: data.contentBn || '',
-              contentEn: data.contentEn || data.contentBn || '',
-              isFeatured: data.isFeatured || false,
-              viewsCount: data.viewsCount || 0
-            });
-          });
-
-          setFirestorePosts(list);
-        },
-        (err) => {
-          console.warn('Firestore recent_news error:', err);
-        }
+    return watch('recent_news', async () => {
+      const docs = await listDocuments('recent_news', { limit: 15 });
+      setNewsPosts(
+        docs.map((data) => ({
+          id: data.id,
+          titleBn: data.titleBn || '',
+          titleEn: data.titleEn || data.titleBn || '',
+          category: data.category || 'academic',
+          categoryBn: data.categoryBn || 'সাধারণ খবরাখবর',
+          categoryEn: data.categoryEn || 'General News',
+          imageUrl: data.imageUrl || 'https://media.istockphoto.com/id/2022468311/vector/single-man-stick-figure-icon.jpg?s=1024x1024&w=is&k=20&c=knHDGHH3klSPlNHLoqfsFcAkVJc78KuABkT5lVLCXco=',
+          date: data.date || '',
+          authorBn: data.authorBn || '',
+          authorEn: data.authorEn || '',
+          summaryBn: data.summaryBn || '',
+          summaryEn: data.summaryEn || data.summaryBn || '',
+          contentBn: data.contentBn || '',
+          contentEn: data.contentEn || data.contentBn || '',
+          isFeatured: data.isFeatured || false,
+          viewsCount: data.viewsCount || 0,
+        }))
       );
-    } catch (err) {
-      console.warn('recent_news catch error:', err);
-    }
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    });
   }, []);
 
-  const posts = firestorePosts.length > 0 ? firestorePosts : NEWS_POSTS;
+  const posts = newsPosts.length > 0 ? newsPosts : NEWS_POSTS;
   const totalSlides = posts.length;
 
   // Auto-slide effect

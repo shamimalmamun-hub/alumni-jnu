@@ -1,5 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { getDocument, setDocument } from './db';
 
 export interface EmailVariable {
   key: string;
@@ -159,10 +158,8 @@ export async function loadSavedEmailConfig(): Promise<{
   enabled: boolean;
 }> {
   try {
-    const docRef = doc(db, 'settings', 'email_config');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
+    const data = await getDocument('settings', 'email_config');
+    if (data) {
       return {
         subject: data.subject || DEFAULT_EMAIL_SUBJECT,
         template: data.template || DEFAULT_EMAIL_TEMPLATE,
@@ -170,7 +167,7 @@ export async function loadSavedEmailConfig(): Promise<{
       };
     }
   } catch (err) {
-    console.warn('Error loading email config from Firestore:', err);
+    console.warn('Error loading email config from database:', err);
   }
   return {
     subject: DEFAULT_EMAIL_SUBJECT,
@@ -181,20 +178,15 @@ export async function loadSavedEmailConfig(): Promise<{
 
 export async function saveEmailFullConfig(subject: string, template: string, enabled: boolean): Promise<boolean> {
   try {
-    const docRef = doc(db, 'settings', 'email_config');
-    await setDoc(
-      docRef,
-      {
-        subject,
-        template,
-        enabled,
-        updatedAt: serverTimestamp(),
-      },
+    await setDocument(
+      'settings',
+      'email_config',
+      { subject, template, enabled, updatedAt: new Date().toISOString() },
       { merge: true }
     );
     return true;
   } catch (err) {
-    console.error('Error saving email config to Firestore:', err);
+    console.error('Error saving email config to database:', err);
     throw err;
   }
 }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserCheck, Shield, HeartHandshake } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { getDocument, watch } from '../lib/db';
 
 export interface CommunityStatsData {
   titleBn?: string;
@@ -44,19 +43,16 @@ export const CommunityStatsWidget: React.FC<CommunityStatsWidgetProps> = ({
   onNavigateToLeadership,
   onNavigateToDonation,
 }) => {
-  // Admin-managed numbers, live from Firestore `site_settings/community_stats`
+  // Admin-managed numbers from D1 `site_settings/community_stats`
   const [adminStats, setAdminStats] = useState<CommunityStatsData>(DEFAULT_MANUAL_STATS);
 
   useEffect(() => {
-    return onSnapshot(
-      doc(db, 'site_settings', 'community_stats'),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          setAdminStats({ ...DEFAULT_MANUAL_STATS, ...(docSnap.data() as CommunityStatsData), mode: 'manual' as const });
-        }
-      },
-      (err) => console.warn('Community stats listener error:', err)
-    );
+    return watch('site_settings', async () => {
+      const data = await getDocument<CommunityStatsData>('site_settings', 'community_stats');
+      if (data) {
+        setAdminStats({ ...DEFAULT_MANUAL_STATS, ...data, mode: 'manual' as const });
+      }
+    });
   }, []);
 
   const toBnNumber = (val: number | string) => {

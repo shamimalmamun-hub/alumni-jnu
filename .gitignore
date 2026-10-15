@@ -11,3 +11,5 @@ wrangler-build/
 server.cjs
 server.cjs.map
 .commandcode/
+.dev.vars
+.playwright-mcp/

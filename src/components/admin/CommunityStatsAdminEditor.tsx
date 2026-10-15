@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users, UserCheck, Shield, HeartHandshake, Save, RotateCcw, CheckCircle2, SlidersHorizontal, Lock } from 'lucide-react';
-import { db } from '../../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getDocument, setDocument } from '../../lib/db';
 import { CommunityStatsData, DEFAULT_MANUAL_STATS } from '../CommunityStatsWidget';
 
 interface CommunityStatsAdminEditorProps {
@@ -19,10 +18,10 @@ export const CommunityStatsAdminEditor: React.FC<CommunityStatsAdminEditorProps>
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
   useEffect(() => {
-    getDoc(doc(db, 'site_settings', 'community_stats'))
-      .then((snap) => {
-        if (snap.exists()) {
-          setFormData({ ...DEFAULT_MANUAL_STATS, ...(snap.data() as CommunityStatsData), mode: 'manual' });
+    getDocument<CommunityStatsData>('site_settings', 'community_stats')
+      .then((data) => {
+        if (data) {
+          setFormData({ ...DEFAULT_MANUAL_STATS, ...data, mode: 'manual' });
         }
       })
       .catch((err) => console.error('Error fetching community stats settings:', err))
@@ -38,8 +37,8 @@ export const CommunityStatsAdminEditor: React.FC<CommunityStatsAdminEditorProps>
         mode: 'manual', // Strictly manual - Auto Sync turned off
       };
 
-      // Written once to Firestore; every open page receives it through its live listener.
-      await setDoc(doc(db, 'site_settings', 'community_stats'), {
+      // Saved to D1; other open pages pick it up on their next load.
+      await setDocument('site_settings', 'community_stats', {
         ...payload,
         updatedAt: new Date().toISOString(),
       }, { merge: true });

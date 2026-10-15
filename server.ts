@@ -178,6 +178,25 @@ app.all('/api/test-email', async (req, res) => {
   }
 });
 
+// Dev only: D1-backed routes live in the Worker (`npm run dev:worker`, port 8787).
+const WORKER_ORIGIN = process.env.WORKER_ORIGIN || 'http://localhost:8787';
+app.all(['/api/db/*', '/api/admin/*', '/api/member-login'], async (req, res) => {
+  try {
+    const hasBody = !['GET', 'HEAD'].includes(req.method);
+    const upstream = await fetch(WORKER_ORIGIN + req.originalUrl, {
+      method: req.method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+      },
+      body: hasBody ? JSON.stringify(req.body ?? {}) : undefined,
+    });
+    res.status(upstream.status).type('application/json').send(await upstream.text());
+  } catch (err: any) {
+    res.status(502).json({ error: `Worker unreachable at ${WORKER_ORIGIN}. Run \`npm run dev:worker\`. (${err.message})` });
+  }
+});
+
 // Vite Middleware for Full-Stack React development & Production Static serving
 async function setupViteMiddleware() {
   if (process.env.NODE_ENV !== 'production') {

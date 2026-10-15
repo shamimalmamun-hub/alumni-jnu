@@ -1,7 +1,6 @@
 import { NoticeItem } from '../data/portalData';
 import { BASELINE_CLIENT_NOTICES } from '../data/baselineNotices';
-import { db } from '../lib/firebase';
-import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { listDocuments, setDocument, watch } from '../lib/db';
 
 export interface NoticeRecord {
   id: string;
@@ -16,8 +15,8 @@ export interface NoticeRecord {
   createdAt?: string;
 }
 
-// Firestore documents are capped at 1 MiB; leave headroom for the other fields.
-const MAX_ATTACHMENT_CHARS = 900_000;
+// D1 rows are capped at 2 MB; leave headroom for the other fields.
+const MAX_ATTACHMENT_CHARS = 1_500_000;
 
 const byNewest = (a: NoticeRecord, b: NoticeRecord) => {
   const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -26,8 +25,7 @@ const byNewest = (a: NoticeRecord, b: NoticeRecord) => {
 };
 
 /**
- * Publish (create or overwrite) a notice straight to Firestore.
- * Every connected client receives it through its live listener.
+ * Publish (create or overwrite) a notice in D1. Other clients see it on their next page load.
  */
 export async function publishNotice(
   newNotice: Omit<NoticeRecord, 'id' | 'createdAt'> & { id?: string }
@@ -52,19 +50,19 @@ export async function publishNotice(
   };
 
   if (data.imageUrl.length + data.pdfUrl.length > MAX_ATTACHMENT_CHARS) {
-    throw new Error('Attachment too large: image + PDF must stay under about 700 KB to be stored in Firestore.');
+    throw new Error('Attachment too large: image + PDF must stay under about 1 MB to be stored.');
   }
 
-  await setDoc(doc(db, 'notices', id), data);
+  await setDocument('notices', id, data);
   return record;
 }
 
 /**
  * Delete a notice for everyone. A tombstone document is written (instead of a hard delete)
- * so that built-in baseline notices, which are not stored in Firestore, are hidden too.
+ * so that built-in baseline notices, which are not stored in the database, are hidden too.
  */
 export async function removeNotice(id: string): Promise<void> {
-  await setDoc(doc(db, 'notices', id), { deleted: true });
+  await setDocument('notices', id, { deleted: true });
 }
 
 /**
@@ -94,27 +92,21 @@ export function recordToNoticeItem(r: NoticeRecord): NoticeItem {
 }
 
 /**
- * Live notice list: built-in baseline notices overlaid with the Firestore `notices` collection.
- * The callback fires immediately with the baseline, then on every remote change.
+ * Notice list: built-in baseline notices overlaid with the D1 `notices` collection.
+ * The callback fires immediately with the baseline, then after the fetch and after any local publish/delete.
  */
 export function subscribeNotices(callback: (notices: NoticeRecord[]) => void): () => void {
   const baseline = new Map<string, NoticeRecord>();
   (BASELINE_CLIENT_NOTICES || []).forEach((n) => n?.id && baseline.set(n.id, n));
   callback(Array.from(baseline.values()).sort(byNewest));
 
-  return onSnapshot(
-    collection(db, 'notices'),
-    (snapshot) => {
-      const map = new Map(baseline);
-      snapshot.forEach((d) => {
-        const data = d.data() as any;
-        if (data.deleted) map.delete(d.id);
-        else map.set(d.id, { id: d.id, ...data } as NoticeRecord);
-      });
-      callback(Array.from(map.values()).sort(byNewest));
-    },
-    (error) => {
-      console.warn('Notices listener error:', error?.message || error);
-    }
-  );
+  return watch('notices', async () => {
+    const docs = await listDocuments<any>('notices');
+    const map = new Map(baseline);
+    docs.forEach((d) => {
+      if (d.deleted) map.delete(d.id);
+      else map.set(d.id, d as NoticeRecord);
+    });
+    callback(Array.from(map.values()).sort(byNewest));
+  });
 }

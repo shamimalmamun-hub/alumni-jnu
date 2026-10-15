@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { X, Lock, Phone, KeyRound, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
 
 interface MemberLoginModalProps {
   isOpen: boolean;
@@ -10,12 +8,6 @@ interface MemberLoginModalProps {
   onLoginSuccess: (memberData: any) => void;
   targetPageName?: string;
 }
-
-// Convert Bengali digits (০-৯) to English digits (0-9)
-const bnToEnDigits = (str: string): string => {
-  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
-  return str.replace(/[০-৯]/g, (d) => String(banglaDigits.indexOf(d)));
-};
 
 export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({
   isOpen,
@@ -50,65 +42,17 @@ export const MemberLoginModal: React.FC<MemberLoginModalProps> = ({
     setLoading(true);
 
     try {
-      const cleanIdInput = bnToEnDigits(rawId).toLowerCase().replace(/[^a-z0-9]/gi, '');
-      const cleanMobileInput = bnToEnDigits(rawMobile).replace(/\D/g, '');
+      const res = await fetch('/api/member-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: rawId, mobile: rawMobile }),
+      });
+      if (!res.ok) throw new Error(`Login request failed: ${res.status}`);
+      const result: { member: any; status: string | null; name: string } = await res.json();
 
-      // Query memberships from Firestore
-      const colRef = collection(db, 'memberships');
-      const snapshot = await getDocs(colRef).catch(() => null);
-
-      let foundMember: any = null;
-      let matchedStatus: string | null = null;
-      let matchedMemberName: string = '';
-
-      if (snapshot && !snapshot.empty) {
-        snapshot.forEach((docSnap) => {
-          if (foundMember) return;
-          const data = docSnap.data();
-
-          const docId = docSnap.id.toLowerCase();
-          const formNo = (data.formNo || data.membershipId || docSnap.id || '').toLowerCase();
-          const cleanFormNo = bnToEnDigits(formNo).replace(/[^a-z0-9]/gi, '');
-          const formDigitsOnly = cleanFormNo.replace(/\D/g, '');
-          const last4FormDigits = formDigitsOnly.slice(-4);
-
-          const mobile = bnToEnDigits(data.mobile || data.phone || '').replace(/\D/g, '');
-
-          // Check Form No or ID match
-          const matchesId =
-            cleanFormNo === cleanIdInput ||
-            cleanFormNo.includes(cleanIdInput) ||
-            docId === cleanIdInput ||
-            (cleanIdInput.length >= 3 && last4FormDigits === cleanIdInput);
-
-          // Check Mobile match (matches full or last 10-11 digits)
-          const matchesMobile =
-            mobile === cleanMobileInput ||
-            (cleanMobileInput.length >= 8 && mobile.endsWith(cleanMobileInput)) ||
-            (mobile.length >= 8 && cleanMobileInput.endsWith(mobile));
-
-          if (matchesId && matchesMobile) {
-            matchedStatus = data.status || 'pending';
-            matchedMemberName = data.applicantNameBn || data.fullName || data.applicantNameEn || 'সম্মানিত সদস্য';
-
-            // Allow login if approved by Admin or pending
-            if (data.status === 'approved') {
-              foundMember = {
-                id: docSnap.id,
-                formNo: data.formNo || data.membershipId || docSnap.id,
-                applicantNameBn: data.applicantNameBn || data.fullName || 'সম্মানিত সদস্য',
-                applicantNameEn: data.applicantNameEn || '',
-                mobile: data.mobile || data.phone || '',
-                session: data.session || data.batch || '',
-                program: data.program || 'bsc_honours',
-                userPhotoUrl: data.userPhotoUrl || '',
-                bloodGroup: data.bloodGroup || '',
-                status: data.status,
-              };
-            }
-          }
-        });
-      }
+      const foundMember = result.member;
+      const matchedStatus = result.status;
+      const matchedMemberName = result.name;
 
       if (foundMember) {
         onLoginSuccess(foundMember);

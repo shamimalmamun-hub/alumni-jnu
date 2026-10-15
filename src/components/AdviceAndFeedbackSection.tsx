@@ -16,8 +16,7 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { addDocument } from '../lib/db';
 
 interface AdviceAndFeedbackSectionProps {
   language?: 'bn' | 'en';
@@ -103,14 +102,14 @@ export const AdviceAndFeedbackSection: React.FC<AdviceAndFeedbackSectionProps> =
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'feedback_messages'), {
+      await addDocument('feedback_messages', {
         senderName: senderName.trim(),
         senderBatch: senderBatch.trim(),
         senderContact: senderContact.trim(),
         category,
         subject: subject.trim(),
         message: message.trim(),
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         status: 'unread'
       });
       setSubmitSuccess(true);

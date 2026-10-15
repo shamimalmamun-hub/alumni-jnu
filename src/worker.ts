@@ -1,4 +1,6 @@
-export interface Env {
+import { handleDataApi, type DbEnv } from './worker/db';
+
+export interface Env extends DbEnv {
   APP_URL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
@@ -78,7 +80,7 @@ function jsonResponse(obj: any, status = 200): Response {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     },
   });
@@ -174,6 +176,10 @@ async function handleApi(
     }
   }
 
+  /* ------------------------------------------------- database + admin login */
+  const dataResponse = await handleDataApi(request, url, env, normalizedPath);
+  if (dataResponse) return dataResponse;
+
   /* ----------------------------------------------------------- unknown API */
   console.log(`[Worker] Unhandled API route: ${method} ${normalizedPath}`);
   return jsonResponse({ error: 'Not found', path: normalizedPath }, 404);
@@ -186,7 +192,7 @@ export default {
 
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     };
 
@@ -197,8 +203,7 @@ export default {
       });
     }
 
-    // 1. /api/* routes: health and email only. All data lives in Firestore and is
-    //    read/written directly by the browser.
+    // 1. /api/* routes: health, email, admin login and the D1-backed /api/db/* document API.
     if (normalizedPath.startsWith('/api')) {
       try {
         return await handleApi(normalizedPath.replace(/\/$/, ''), request, url, env);

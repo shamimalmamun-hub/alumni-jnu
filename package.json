@@ -10,7 +10,10 @@
     "deploy": "npm run build && wrangler deploy",
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs server.cjs.map",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "dev:worker": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply alumni-jnu --local",
+    "db:migrate:remote": "wrangler d1 migrations apply alumni-jnu --remote"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

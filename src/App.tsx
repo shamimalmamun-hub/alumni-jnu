@@ -28,9 +28,9 @@ import { DonationSelectionModal, DonationCategoryType } from './components/Donat
 import { MemberCardModal, CardMemberData } from './components/MemberCardModal';
 import { MemberFormPdfModal } from './components/MemberFormPdfModal';
 import { MemberLoginModal } from './components/MemberLoginModal';
-import { db, auth } from './lib/firebase';
+import { auth } from './lib/firebase';
+import { findMembership } from './lib/membershipLookup';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Footer } from './components/Footer';
 import { AdviceAndFeedbackSection } from './components/AdviceAndFeedbackSection';
 import { NoticeItem, NOTICES_DATA } from './data/portalData';
@@ -160,32 +160,8 @@ export default function App() {
       // Fetch Form PDF data if formKey exists
       if (formKey) {
         try {
-          // 1. Try finding in Firestore by Document ID first
-          const docRef = doc(db, 'memberships', formKey);
-          const docSnap = await getDoc(docRef).catch(() => null);
-          if (docSnap && docSnap.exists()) {
-            setDirectPdfMember({ id: docSnap.id, ...(docSnap.data() as any) });
-          } else {
-            // 2. Query by formNo (exact or uppercase)
-            const colRef = collection(db, 'memberships');
-            let snap = await getDocs(query(colRef, where('formNo', '==', formKey))).catch(() => null);
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('formNo', '==', formKey.toUpperCase()))).catch(() => null);
-            }
-            // 3. Query by transactionId
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('transactionId', '==', formKey))).catch(() => null);
-            }
-            // 4. Query by mobile
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('mobile', '==', formKey))).catch(() => null);
-            }
-
-            if (snap && !snap.empty) {
-              const matchedDoc = snap.docs[0];
-              setDirectPdfMember({ id: matchedDoc.id, ...(matchedDoc.data() as any) });
-            }
-          }
+          const found = await findMembership(formKey);
+          if (found) setDirectPdfMember(found);
         } catch (e) {
           console.warn('Error fetching member form PDF from URL:', e);
         }
@@ -193,35 +169,8 @@ export default function App() {
 
       if (cardKey) {
         try {
-          // 1. Try finding in Firestore by Document ID first
-          const docRef = doc(db, 'memberships', cardKey);
-          const docSnap = await getDoc(docRef).catch(() => null);
-          if (docSnap && docSnap.exists()) {
-            setDirectCardMember({ id: docSnap.id, ...(docSnap.data() as any) });
-          } else {
-            // 2. Try querying by formNo (exact or uppercase)
-            const colRef = collection(db, 'memberships');
-            let snap = await getDocs(query(colRef, where('formNo', '==', cardKey))).catch(() => null);
-            
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('formNo', '==', cardKey.toUpperCase()))).catch(() => null);
-            }
-            
-            // 3. Try querying by transactionId
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('transactionId', '==', cardKey))).catch(() => null);
-            }
-
-            // 4. Try querying by mobile number
-            if (!snap || snap.empty) {
-              snap = await getDocs(query(colRef, where('mobile', '==', cardKey))).catch(() => null);
-            }
-
-            if (snap && !snap.empty) {
-              const matchedDoc = snap.docs[0];
-              setDirectCardMember({ id: matchedDoc.id, ...(matchedDoc.data() as any) });
-            }
-          }
+          const found = await findMembership(cardKey);
+          if (found) setDirectCardMember(found);
         } catch (e) {
           console.warn('Error fetching member card from URL:', e);
         }
