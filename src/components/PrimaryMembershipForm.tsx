@@ -1408,7 +1408,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
         </div>
 
         {/* Membership Application Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 text-xs sm:text-sm font-sans">
+        <form onSubmit={handleSubmit} noValidate className="space-y-3 sm:space-y-4 text-xs sm:text-sm font-sans">
           {/* Top Row: Date & Membership ID */}
           <div className="flex flex-col min-[480px]:flex-row justify-between items-stretch min-[480px]:items-center gap-2 mb-2 bg-emerald-50/70 sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none border border-emerald-200/80 sm:border-none shadow-2xs sm:shadow-none">
             <div className="flex items-center gap-2 flex-1">
