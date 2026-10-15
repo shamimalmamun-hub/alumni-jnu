@@ -26,15 +26,14 @@ import {
   Info,
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
+import { saveDocWithRetry, updateDocWithRetry } from '../../lib/firestoreSync';
 import {
   collection,
   doc,
-  setDoc,
   getDoc,
   getDocs,
   query,
   where,
-  updateDoc,
 } from 'firebase/firestore';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
@@ -446,11 +445,11 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
       }
 
       // 3. Save to `payments` collection in Firestore safely
-      try {
-        const paymentRef = doc(db, 'payments', paymentDocId);
-        await setDoc(paymentRef, firestoreRecord);
-      } catch (fsErr) {
-        console.warn('Firestore payment save warning (fallback used):', fsErr);
+      const paymentSaved = await saveDocWithRetry(doc(db, 'payments', paymentDocId), firestoreRecord);
+      if (!paymentSaved) {
+        setErrorMessage(language === 'bn'
+          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে পেমেন্ট তথ্য সংরক্ষণ ব্যর্থ হয়েছে! ইন্টারনেট সংযোগ পরীক্ষা করে ডাউনলোড/প্রিন্ট করা রশিদ সংরক্ষণ করুন.আবার পেমেন্ট সাবমিট করবেন না।'
+          : 'Warning: Failed to save payment info to the central database! Check your connection and keep the downloaded/printed receipt. Do not submit payment again.');
       }
 
       // 4. If membershipId provided, update the membership record in Firestore
@@ -459,7 +458,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
           const memRef = doc(db, 'memberships', membershipId.trim());
           const memSnap = await getDoc(memRef);
           if (memSnap.exists()) {
-            await updateDoc(memRef, {
+            const membershipPaid = await updateDocWithRetry(memRef, {
               paymentStatus: 'paid',
               paymentMethod,
               senderNumber: senderNumber.trim(),
@@ -468,6 +467,9 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
               paidAmount: amount,
               paidAt: now,
             });
+            if (!membershipPaid) {
+              console.warn('Membership payment-status update failed after retries; local receipt still generated.');
+            }
           }
         } catch (memErr) {
           console.warn('Membership status update warning:', memErr);

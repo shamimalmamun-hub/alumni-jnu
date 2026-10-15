@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import { db } from '../lib/firebase';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, getDocs, collection } from 'firebase/firestore';
+import { saveDocWithRetry, updateDocWithRetry } from '../lib/firestoreSync';
 import { BATCH_SESSION_LIST } from '../data/batchSessionData';
 import {
   MembershipPaymentSection,
@@ -557,34 +558,24 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
 
       // 3. Guaranteed sync to Central Server API & Firestore before navigation
       try {
-        await Promise.race([
-          Promise.all([
-            fetch('/api/memberships', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-              keepalive: true,
-            }),
-            setDoc(doc(db, 'memberships', uniqueSubmissionId), payload).catch((fsErr) => {
-              console.warn('Firestore write warning (server API active):', fsErr);
-            })
-          ]),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
-        ]);
-      } catch (e) {
-        console.warn('Primary sync timeout/error, executing guaranteed server sync fallback:', e);
+        await fetch('/api/memberships', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+      } catch {
         try {
-          await fetch('/api/memberships', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            keepalive: true,
-          });
-        } catch (err) {
-          try {
-            navigator.sendBeacon('/api/memberships', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-          } catch (beaconErr) {}
-        }
+          navigator.sendBeacon('/api/memberships', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+        } catch {}
+      }
+
+      const savedToCentralDb = await saveDocWithRetry(doc(db, 'memberships', uniqueSubmissionId), payload);
+      if (!savedToCentralDb) {
+        const msg = language === 'bn'
+          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে আবেদন সংরক্ষণ ব্যর্থ হয়েছে! পেমেন্টের পরে অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন.'
+          : 'Warning: Failed to save your application to the central database! After payment, please check your internet connection and try again.';
+        alert(msg);
       }
 
       // 4. Navigate to payment page
@@ -750,10 +741,12 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       }
 
       // 2. Also save to Firestore with backward-compatible aliases and payment details
-      try {
-        await setDoc(doc(db, 'memberships', membershipDocId), payload);
-      } catch (fsErr) {
-        console.warn('Firestore write warning (server API secured):', fsErr);
+      const fsSaved = await saveDocWithRetry(doc(db, 'memberships', membershipDocId), payload);
+      if (!fsSaved) {
+        const msg = language === 'bn'
+          ? 'সতর্কতা: কেন্দ্রীয় ডাটাবেজে তথ্য সংরক্ষণ ব্যর্থ হয়েছে! অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করুন.'
+          : 'Warning: Failed to save to the central database! Please check your internet connection.';
+        alert(msg);
       }
 
       // Local storage backup for offline/fast card generation
