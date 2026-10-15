@@ -15,98 +15,7 @@ export const onRequest = async (context: any) => {
 
   const normalizedPath = url.pathname.replace(/\/$/, '');
 
-  const rawSmsKey = env.SMS_API_KEY;
-  const apiKey = (rawSmsKey && rawSmsKey !== 'BMszEcuXSaGtE4xr68JP8G6m3uP04IZidBWpgXIB')
-    ? rawSmsKey
-    : 'juOIwULseyuzv3Z9AUKk';
-  const SMS_SENDER_ID = env.SMS_SENDER_ID || '8809648906169';
-  const SMS_API_URL = env.SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
-
-  const sendDirectSMS = async (phone: string, msg: string) => {
-    const digitsOnly = String(phone).replace(/[^0-9]/g, '');
-    let local = digitsOnly;
-    if (digitsOnly.startsWith('880')) local = digitsOnly.slice(2);
-    else if (digitsOnly.startsWith('88')) local = digitsOnly.slice(2);
-    if (!local.startsWith('0') && local.length === 10) local = `0${local}`;
-    const cleanNumber = local.startsWith('0') ? local : `0${local}`;
-
-    const hasUnicode = /[^\u0000-\u007F]/.test(msg);
-    const smsType = hasUnicode ? 'unicode' : 'text';
-
-    const postParams = new URLSearchParams({
-      api_key: apiKey,
-      type: smsType,
-      number: cleanNumber,
-      message: msg,
-    });
-    if (SMS_SENDER_ID) postParams.append('senderid', SMS_SENDER_ID);
-
-    try {
-      let res = await fetch(SMS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: postParams.toString(),
-      });
-      let textRes = await res.text();
-      let jsonRes: any = null;
-      try { jsonRes = JSON.parse(textRes); } catch { jsonRes = { raw: textRes }; }
-
-      if (!jsonRes || (jsonRes.response_code !== 202 && jsonRes.response_code !== 200)) {
-        const getUrl = `${SMS_API_URL}?${postParams.toString()}`;
-        const getRes = await fetch(getUrl, { method: 'GET' });
-        const getText = await getRes.text();
-        try { jsonRes = JSON.parse(getText); } catch { jsonRes = { raw: getText }; }
-      }
-      return jsonRes;
-    } catch (e: any) {
-      console.error('Send direct SMS failed:', e);
-      return { error: e.message };
-    }
-  };
-
-  // 1. Send SMS endpoint
-  if (normalizedPath === '/api/send-sms') {
-    try {
-      let body: any = {};
-      try { body = await req.json(); } catch { body = {}; }
-      const { mobile, name, amount, tranId, message: customMsg } = body;
-      const targetMobile = mobile || '';
-
-      if (!targetMobile) {
-        return new Response(JSON.stringify({ success: false, error: 'Mobile number is required' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-
-      const applicantName = (name && name !== 'Applicant' && name !== 'সদস্য') ? name : '';
-      const displayName = applicantName ? applicantName : 'সদস্য';
-      const msgToSend = customMsg || `অভিনন্দন ${displayName}! আনন্দ মোহন কলেজ সমাজবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনে আপনার সদস্য নিবন্ধন ও ৳${amount || '৫০০'} ফি সফলভাবে গৃহীত হয়েছে। TrxID: ${tranId || 'N/A'}। ধন্যবাদ!`;
-      const result = await sendDirectSMS(targetMobile, msgToSend);
-      return new Response(JSON.stringify({ success: true, data: result }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    } catch (err: any) {
-      return new Response(JSON.stringify({ success: false, error: err.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
-  }
-
-  // 2. Test SMS endpoint
-  if (normalizedPath === '/api/test-sms') {
-    const phone = url.searchParams.get('phone') || url.searchParams.get('mobile') || '01401996674';
-    const testMsg = `আনন্দ মোহন কলেজ সমাজবিজ্ঞান বিভাগ অ্যালামনাই: টেস্ট এসএমএস সফল হয়েছে! সময়: ${new Date().toLocaleTimeString('bn-BD')}`;
-    const result = await sendDirectSMS(phone, testMsg);
-    return new Response(JSON.stringify({ status: 'SUCCESS', target: phone, result }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
-
-  // 3. SSLCommerz Callback
+  // SSLCommerz Callback
   if (normalizedPath === '/api/sslcommerz/callback') {
     let payload: Record<string, any> = {};
     for (const [key, value] of url.searchParams.entries()) {
@@ -168,35 +77,6 @@ export const onRequest = async (context: any) => {
 
     if (status === 'VALID' || status === 'VALIDATED' || status === 'SUCCESS') {
       targetUrl = `${url.origin}/?payment_gateway=sslcommerz&ssl_status=success&tran_id=${encodeURIComponent(String(tran_id))}&val_id=${encodeURIComponent(String(val_id))}&card_type=${encodeURIComponent(String(card_type))}${membershipId ? `&membershipId=${encodeURIComponent(String(membershipId))}` : ''}`;
-
-      // Dispatch auto SMS with accurate name
-      const custPhone = payload.applicantPhone || payload.value_c || payload.cus_phone || payload.phone || '';
-      
-      let applicantName = payload.applicantName || url.searchParams.get('applicantName') || '';
-      if (!applicantName && payload.value_d) {
-        try {
-          applicantName = decodeURIComponent(payload.value_d);
-        } catch {
-          applicantName = payload.value_d;
-        }
-      }
-      if (!applicantName || applicantName === 'Applicant') {
-        applicantName = payload.cus_name || payload.name || '';
-      }
-      if (applicantName === 'Applicant') {
-        applicantName = '';
-      }
-      const displayName = applicantName ? applicantName : 'সদস্য';
-      const totalAmount = payload.applicantAmount || payload.amount || payload.total_amount || '৫০০';
-
-      if (custPhone) {
-        context.waitUntil?.(
-          sendDirectSMS(
-            custPhone,
-            `অভিনন্দন ${displayName}! আনন্দ মোহন কলেজ সমাজবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনে আপনার সদস্য নিবন্ধন ও ৳${totalAmount} ফি সফলভাবে গৃহীত হয়েছে। TrxID: ${tran_id}। ধন্যবাদ!`
-          )
-        );
-      }
     } else if (status === 'CANCELLED' || status === 'CANCEL') {
       targetUrl = `${url.origin}/?payment_gateway=sslcommerz&ssl_status=cancel${membershipId ? `&membershipId=${encodeURIComponent(String(membershipId))}` : ''}`;
     }

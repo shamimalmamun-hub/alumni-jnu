@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { optimizeImage, uploadToCloudinary } from '../../lib/cloudinary';
 import { 
   ArrowLeft, 
   Briefcase, 
@@ -86,24 +87,20 @@ export const JobNewsPage: React.FC<JobNewsPageProps> = ({ language, onBackToHome
     fileType: 'image'
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const fileType: 'image' | 'pdf' = isPdf ? 'pdf' : 'image';
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setNewJob((prev) => ({
-        ...prev,
-        fileUrl: result,
-        fileName: file.name,
-        fileType: fileType
-      }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const fileUrl = await uploadToCloudinary(await optimizeImage(file), 'alumni-jnu/jobs');
+      setNewJob((prev) => ({ ...prev, fileUrl, fileName: file.name, fileType }));
+    } catch (err) {
+      console.error(err);
+      alert('File upload failed. Please try again.');
+    }
   };
 
   useEffect(() => {

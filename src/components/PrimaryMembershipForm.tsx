@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fileToDataUrl, optimizeImage, uploadToCloudinary } from '../lib/cloudinary';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import { db } from '../lib/firebase';
@@ -134,83 +135,43 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const rawUrl = reader.result as string;
-        // Compress photo to max 400x400 JPEG (~40KB) to prevent storage and quota errors
-        try {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxDim = 400;
-            let width = img.width;
-            let height = img.height;
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
-              const compressedUrl = canvas.toDataURL('image/jpeg', 0.82);
-              setPhotoPreview(compressedUrl);
-              setFormData((prev) => ({ ...prev, photoUrl: compressedUrl }));
-              return;
-            }
-            setPhotoPreview(rawUrl);
-            setFormData((prev) => ({ ...prev, photoUrl: rawUrl }));
-          };
-          img.onerror = () => {
-            setPhotoPreview(rawUrl);
-            setFormData((prev) => ({ ...prev, photoUrl: rawUrl }));
-          };
-          img.src = rawUrl;
-        } catch (compErr) {
-          setPhotoPreview(rawUrl);
-          setFormData((prev) => ({ ...prev, photoUrl: rawUrl }));
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    // Compress to max 400x400 JPEG, show it instantly, then swap the stored value for the Cloudinary URL
+    const optimized = await optimizeImage(file, { maxDim: 600 });
+    setPhotoPreview(await fileToDataUrl(optimized));
+    try {
+      const url = await uploadToCloudinary(optimized, 'alumni-jnu/members');
+      setFormData((prev) => ({ ...prev, photoUrl: url }));
+    } catch (err) {
+      console.error(err);
+      alert('Photo upload failed. Please try again.');
     }
   };
 
-  const handleDegreeDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDegreeDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setDegreeDocFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          degreeDocName: file.name,
-          degreeDocData: reader.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setDegreeDocFileName(file.name);
+    try {
+      const url = await uploadToCloudinary(await optimizeImage(file, { maxDim: 2000 }), 'alumni-jnu/degree-docs');
+      setFormData((prev) => ({ ...prev, degreeDocName: file.name, degreeDocData: url }));
+    } catch (err) {
+      console.error(err);
+      alert('Document upload failed. Please try again.');
     }
   };
 
-  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          signatureDataUrl: reader.result as string,
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const url = await uploadToCloudinary(await optimizeImage(file, { maxDim: 800 }), 'alumni-jnu/signatures');
+      setFormData((prev) => ({ ...prev, signatureDataUrl: url }));
+    } catch (err) {
+      console.error(err);
+      alert('Signature upload failed. Please try again.');
     }
   };
 

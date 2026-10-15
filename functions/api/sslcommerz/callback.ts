@@ -81,64 +81,6 @@ export const onRequest = async (context: any) => {
 
   if (status === 'VALID' || status === 'VALIDATED' || status === 'SUCCESS') {
     targetUrl = `${url.origin}/?payment_gateway=sslcommerz&ssl_status=success&tran_id=${encodeURIComponent(String(tran_id))}&val_id=${encodeURIComponent(String(val_id))}&card_type=${encodeURIComponent(String(card_type))}${membershipId ? `&membershipId=${encodeURIComponent(String(membershipId))}` : ''}`;
-
-    // Extract accurate applicant details
-    const custPhone = payload.applicantPhone || payload.value_c || payload.cus_phone || payload.phone || '';
-    
-    let applicantName = payload.applicantName || url.searchParams.get('applicantName') || '';
-    if (!applicantName && payload.value_d) {
-      try {
-        applicantName = decodeURIComponent(payload.value_d);
-      } catch {
-        applicantName = payload.value_d;
-      }
-    }
-    if (!applicantName || applicantName === 'Applicant') {
-      applicantName = payload.cus_name || payload.name || '';
-    }
-    if (applicantName === 'Applicant') {
-      applicantName = '';
-    }
-    const displayName = applicantName ? applicantName : 'সদস্য';
-    const totalAmount = payload.applicantAmount || payload.amount || payload.total_amount || '৫০০';
-
-    if (custPhone) {
-      const rawSmsKey = env.SMS_API_KEY;
-      const apiKey = (rawSmsKey && rawSmsKey !== 'BMszEcuXSaGtE4xr68JP8G6m3uP04IZidBWpgXIB')
-        ? rawSmsKey
-        : 'juOIwULseyuzv3Z9AUKk';
-      const SMS_SENDER_ID = env.SMS_SENDER_ID || '8809648906169';
-      const SMS_API_URL = env.SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
-
-      const digitsOnly = String(custPhone).replace(/[^0-9]/g, '');
-      let local = digitsOnly;
-      if (digitsOnly.startsWith('880')) local = digitsOnly.slice(2);
-      else if (digitsOnly.startsWith('88')) local = digitsOnly.slice(2);
-      if (!local.startsWith('0') && local.length === 10) local = `0${local}`;
-      const cleanNumber = local.startsWith('0') ? local : `0${local}`;
-
-      const formNoVal = payload.formNo || payload.value_b || url.searchParams.get('formNo') || '';
-      const baseUrl = payload.appUrl || url.searchParams.get('appUrl') || url.origin;
-      const cardDownloadUrl = formNoVal ? `${baseUrl}/card/${encodeURIComponent(formNoVal)}` : `${baseUrl}/?trx=${encodeURIComponent(tran_id)}`;
-
-      const msgToSend = `অভিনন্দন ${displayName}! আনন্দ মোহন কলেজ সমাজবিজ্ঞান বিভাগ অ্যালামনাই পুনর্মিলনীতে আপনার নিবন্ধন ও ৳${totalAmount} ফি সফলভাবে গৃহীত হয়েছে (TrxID: ${tran_id})। সদস্য কার্ড ডাউনলোড লিংক: ${cardDownloadUrl}`;
-
-      const postParams = new URLSearchParams({
-        api_key: apiKey,
-        type: 'unicode',
-        number: cleanNumber,
-        message: msgToSend,
-      });
-      if (SMS_SENDER_ID) postParams.append('senderid', SMS_SENDER_ID);
-
-      context.waitUntil?.(
-        fetch(SMS_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-          body: postParams.toString(),
-        }).catch((err: any) => console.error('Callback SMS err:', err))
-      );
-    }
   } else if (status === 'CANCELLED' || status === 'CANCEL') {
     targetUrl = `${url.origin}/?payment_gateway=sslcommerz&ssl_status=cancel${membershipId ? `&membershipId=${encodeURIComponent(String(membershipId))}` : ''}`;
   }

@@ -1,126 +1,8 @@
 export interface Env {
   APP_URL?: string;
-  SMS_API_KEY?: string;
-  SMS_SENDER_ID?: string;
-  SMS_API_URL?: string;
-  SMS_PROVIDER?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   ASSETS?: { fetch: (req: Request) => Promise<Response> };
-}
-
-function normalizeBDPhone(phone: string): { local: string; withCountry: string } {
-  const digitsOnly = String(phone || '').replace(/[^0-9]/g, '');
-  let local = digitsOnly;
-  if (digitsOnly.startsWith('880')) {
-    local = digitsOnly.slice(2);
-  } else if (digitsOnly.startsWith('88')) {
-    local = digitsOnly.slice(2);
-  }
-  if (!local.startsWith('0') && local.length === 10) {
-    local = `0${local}`;
-  }
-  return {
-    local,
-    withCountry: local.startsWith('0') ? `88${local}` : `880${local}`,
-  };
-}
-
-async function sendSMSWithEnv({
-  mobile,
-  message,
-  env,
-}: {
-  mobile: string;
-  message: string;
-  env: Env;
-}): Promise<{ success: boolean; provider: string; data?: any; error?: string }> {
-  const rawSmsKey = env.SMS_API_KEY;
-  const apiKey = (rawSmsKey && rawSmsKey !== 'BMszEcuXSaGtE4xr68JP8G6m3uP04IZidBWpgXIB')
-    ? rawSmsKey
-    : 'juOIwULseyuzv3Z9AUKk';
-  const SMS_PROVIDER = (env.SMS_PROVIDER || 'bulksmsbd').toLowerCase();
-  const SMS_SENDER_ID = env.SMS_SENDER_ID || '8809648906169';
-  const SMS_API_URL = env.SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
-
-  const { local, withCountry } = normalizeBDPhone(mobile);
-  console.log(`[CF Worker SMS] Sending to ${local} (${withCountry}) via ${SMS_PROVIDER}...`);
-
-  try {
-    if (SMS_PROVIDER === 'bulksmsbd' || !SMS_PROVIDER) {
-      const url = SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
-      const targetNumber = local.startsWith('0') ? local : `0${local}`;
-      const hasUnicode = /[^\u0000-\u007F]/.test(message);
-      const smsType = hasUnicode ? 'unicode' : 'text';
-
-      const postParams = new URLSearchParams({
-        api_key: apiKey,
-        type: smsType,
-        number: targetNumber,
-        message: message,
-      });
-      if (SMS_SENDER_ID) {
-        postParams.append('senderid', SMS_SENDER_ID);
-      }
-
-      let res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: postParams.toString(),
-      });
-
-      let textRes = await res.text();
-      let jsonRes: any = null;
-      try {
-        jsonRes = JSON.parse(textRes);
-      } catch (e) {
-        jsonRes = { raw: textRes };
-      }
-
-      if (!jsonRes || (jsonRes.response_code !== 202 && jsonRes.response_code !== 200)) {
-        const getUrl = `${url}?${postParams.toString()}`;
-        const getRes = await fetch(getUrl, { method: 'GET' });
-        const getText = await getRes.text();
-        try {
-          jsonRes = JSON.parse(getText);
-        } catch (e) {
-          jsonRes = { raw: getText };
-        }
-      }
-
-      const isSuccess = Boolean(
-        jsonRes && (
-          jsonRes.response_code === 202 ||
-          jsonRes.response_code === 200 ||
-          jsonRes.success === true ||
-          (typeof textRes === 'string' && textRes.includes('202'))
-        )
-      );
-      return { success: isSuccess, provider: 'bulksmsbd', data: jsonRes };
-    }
-
-    if (SMS_PROVIDER === 'alphasms' || SMS_PROVIDER === 'sms.net.bd') {
-      const url = SMS_API_URL || 'https://api.sms.net.bd/sendsms';
-      const formData = new URLSearchParams();
-      formData.append('api_key', apiKey);
-      formData.append('msg', message);
-      formData.append('to', withCountry);
-      if (SMS_SENDER_ID) formData.append('sender_id', SMS_SENDER_ID);
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString(),
-      });
-      const data = await res.json().catch(() => ({}));
-      return { success: res.ok, provider: 'alphasms', data };
-    }
-
-    return { success: false, provider: 'unknown', error: 'Unknown provider' };
-  } catch (err: any) {
-    console.error('Cloudflare Worker SMS Error:', err);
-    return { success: false, provider: SMS_PROVIDER, error: err.message };
-  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -214,56 +96,10 @@ async function handleApi(
   if (normalizedPath === '/api/health') {
     return jsonResponse({
       status: 'ok',
-      smsConfigured: true,
-      smsProvider: (env.SMS_PROVIDER || 'bulksmsbd').toLowerCase(),
       resendConfigured: Boolean(env.RESEND_API_KEY),
       timestamp: new Date().toISOString(),
       platform: 'cloudflare-worker',
     });
-  }
-
-  /* ------------------------------------------------------------------- SMS */
-  if (normalizedPath === '/api/send-sms') {
-    try {
-      const body = await readBody(request);
-      const { mobile, name, amount, tranId, formNo, cardUrl, message: customMsg } = body;
-      const targetMobile = mobile || '';
-
-      if (!targetMobile) {
-        return jsonResponse({ success: false, error: 'Mobile number is required' }, 400);
-      }
-
-      const applicantName = (name && name !== 'Applicant' && name !== 'সদস্য') ? name : '';
-      const displayName = applicantName ? applicantName : 'সদস্য';
-      const formNoVal = formNo || body.formNo || '';
-      const linkToCard = cardUrl || (formNoVal ? `${url.origin}/card/${encodeURIComponent(formNoVal)}` : (tranId ? `${url.origin}/card/${encodeURIComponent(tranId)}` : `${url.origin}/card/BOTANY-ALUMNI`));
-
-      let msgToSend = (customMsg || '').trim();
-      if (!msgToSend) {
-        msgToSend = `অভিনন্দন ${displayName}! উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সদস্য নিবন্ধনে আপনার আবেদন ও ৳${amount || '৫০০'} ফি সফলভাবে গৃহীত হয়েছে (TrxID: ${tranId || 'N/A'})।`;
-      }
-
-      const smsResult = await sendSMSWithEnv({
-        mobile: targetMobile,
-        message: msgToSend,
-        env,
-      });
-
-      return jsonResponse({ ...smsResult, cardUrl: linkToCard });
-    } catch (err: any) {
-      return jsonResponse({ success: false, error: err.message }, 500);
-    }
-  }
-
-  if (normalizedPath === '/api/test-sms') {
-    const phone = url.searchParams.get('phone') || url.searchParams.get('mobile') || '01401996674';
-    const testMsg = `উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন: টেস্ট এসএমএস সফল হয়েছে! সময়: ${new Date().toLocaleTimeString('bn-BD')}`;
-    const result = await sendSMSWithEnv({
-      mobile: phone,
-      message: testMsg,
-      env,
-    });
-    return jsonResponse(result);
   }
 
   /* ----------------------------------------------------------------- email */
@@ -361,7 +197,7 @@ export default {
       });
     }
 
-    // 1. /api/* routes: health, SMS and email only. All data lives in Firestore and is
+    // 1. /api/* routes: health and email only. All data lives in Firestore and is
     //    read/written directly by the browser.
     if (normalizedPath.startsWith('/api')) {
       try {

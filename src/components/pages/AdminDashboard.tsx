@@ -77,8 +77,7 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { BATCH_SESSION_LIST } from '../../data/batchSessionData';
 import { EmailTemplateSettings } from '../admin/EmailTemplateSettings';
 import { CommunityStatsAdminEditor } from '../admin/CommunityStatsAdminEditor';
-import { formatCustomSMS, loadSavedSMSTemplate, DEFAULT_SMS_TEMPLATE } from '../../lib/smsConfig';
-import { dispatchPaymentSMS } from '../../lib/smsService';
+import { optimizeImage, uploadToCloudinary } from '../../lib/cloudinary';
 
 enum OperationType {
   CREATE = 'create',
@@ -299,9 +298,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [adminPage, setAdminPage] = useState<number>(1);
   const ADMIN_ITEMS_PER_PAGE = 10;
 
-  // Custom SMS Body Template State
-  const [smsCustomTemplate, setSmsCustomTemplate] = useState<string>(DEFAULT_SMS_TEMPLATE);
-
   // Email Customization & Send Modal State
   const [isEmailModalOpen, setIsEmailModalOpen] = useState<boolean>(false);
   const [emailTarget, setEmailTarget] = useState<{
@@ -317,13 +313,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
   const [emailErrMsg, setEmailErrMsg] = useState<string | null>(null);
-
-  // Load saved SMS body template
-  useEffect(() => {
-    loadSavedSMSTemplate().then((t) => {
-      if (t) setSmsCustomTemplate(t);
-    }).catch(() => {});
-  }, []);
 
   // Data states
   const [memberships, setMemberships] = useState<MembershipRecord[]>([]);
@@ -717,14 +706,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ? '✓ সফলভাবে পেমেন্ট Paid নিশ্চিত করা হয়েছে এবং নিবন্ধিত তালিকায় স্থানান্তরিত হয়েছে!'
             : '✓ Member marked as Paid & Approved and moved to Registered List!'
         );
-
-        // Auto-dispatch confirmation SMS with filled form PDF link if mobile exists
-        if (targetMember && (targetMember.mobile || targetMember.phone)) {
-          const updatedTarget = { ...targetMember, ...updates };
-          handleSendCardSMS(updatedTarget).catch((smsErr) => {
-            console.warn('Auto SMS dispatch after approval error:', smsErr);
-          });
-        }
       } else {
         const label =
           newStatus === 'rejected' ? 'বাতিল (Rejected)' : 'বিবেচনাধীন (Unregistered/Pending)';
@@ -737,83 +718,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `memberships/${id}`);
       alert(language === 'bn' ? 'স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।' : 'Failed to update status');
-    }
-  };
-
-  // Send or Re-send Card & Form PDF Download SMS to Member using Custom Saved Template
-  const [sendingSmsId, setSendingSmsId] = useState<string | null>(null);
-  const handleSendCardSMS = async (member: MembershipRecord) => {
-    const mobileNum = member.mobile || (member as any).phone;
-    if (!mobileNum) {
-      alert(language === 'bn' ? 'সদস্যের কোনো মোবাইল নম্বর নেই।' : 'No mobile number found for this member.');
-      return;
-    }
-    setSendingSmsId(member.id);
-    try {
-      const formNo = member.formNo || member.membershipId || member.id || '';
-      let origin = window.location.origin;
-      if (!origin || origin.includes('localhost')) {
-        origin = 'https://ais-pre-trlneysfvgomaastzre5pu-583514143305.asia-east1.run.app';
-      }
-      const formPdfUrl = formNo
-        ? `${origin}/form/${encodeURIComponent(formNo)}`
-        : (member.transactionId ? `${origin}/?form=${encodeURIComponent(member.transactionId)}` : `${origin}/membership`);
-      const downloadUrl = formNo
-        ? `${origin}/card/${encodeURIComponent(formNo)}`
-        : (member.transactionId ? `${origin}/?trx=${encodeURIComponent(member.transactionId)}` : `${origin}/members-list`);
-      
-      // Ensure we have latest saved template
-      let currentTemplate = smsCustomTemplate;
-      try {
-        const fresh = await loadSavedSMSTemplate();
-        if (fresh) {
-          currentTemplate = fresh;
-          setSmsCustomTemplate(fresh);
-        }
-      } catch {}
-
-      // Format custom body text with member's actual data and filled form PDF link
-      const customBody = formatCustomSMS(
-        currentTemplate,
-        {
-          applicantNameBn: member.applicantNameBn,
-          applicantNameEn: member.applicantNameEn,
-          fullName: member.fullName,
-          formNo: member.formNo || member.membershipId || member.id,
-          mobile: mobileNum,
-          feeAmount: member.feeAmount || (member.membershipType === 'life' ? '2500' : '500'),
-          transactionId: member.transactionId,
-          batch: member.batch || member.bscBatch || member.mscBatch || member.session,
-          cardUrl: downloadUrl,
-          formPdfUrl: formPdfUrl,
-          id: member.id,
-        },
-        origin
-      );
-
-      const res = await dispatchPaymentSMS({
-        mobile: mobileNum,
-        name: member.applicantNameBn || member.fullName || member.applicantNameEn || 'সদস্য',
-        amount: member.feeAmount || (member.membershipType === 'life' ? '2500' : '500'),
-        tranId: member.transactionId || 'Manual',
-        formNo: member.formNo || member.id,
-        cardUrl: downloadUrl,
-        message: customBody,
-      });
-
-      if (res.success) {
-        showToast(
-          language === 'bn'
-            ? `${mobileNum} নম্বরে পূরণকৃত ফরমের PDF লিংকসহ অনুমোদনের এসএমএস সফলভাবে পাঠানো হয়েছে!`
-            : 'Approval SMS with filled form PDF link sent successfully!'
-        );
-      } else {
-        alert(language === 'bn' ? `এসএমএস পাঠানো যায়নি: ${res.error || 'গেটওয়ে ত্রুটি'}` : `SMS failed: ${res.error}`);
-      }
-    } catch (e: any) {
-      alert(`SMS Error: ${e?.message || 'Error'}`);
-    } finally {
-      setSendingSmsId(null);
     }
   };
 
@@ -1304,16 +1208,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setNewNoticeData((prev) => ({
-          ...prev,
-          imageUrl: event.target?.result as string,
-        }));
-      }
-    };
-    reader.readAsDataURL(file);
+    optimizeImage(file, { maxDim: 1800 })
+      .then((optimized) => uploadToCloudinary(optimized, 'alumni-jnu/notices'))
+      .then((imageUrl) => setNewNoticeData((prev) => ({ ...prev, imageUrl })))
+      .catch((err) => {
+        console.error(err);
+        alert('Image upload failed. Please try again.');
+      });
   };
 
   const handleNoticePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1325,17 +1226,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setNewNoticeData((prev) => ({
-          ...prev,
-          pdfUrl: event.target?.result as string,
-          pdfFileName: file.name,
-        }));
-      }
-    };
-    reader.readAsDataURL(file);
+    uploadToCloudinary(file, 'alumni-jnu/notices')
+      .then((pdfUrl) => setNewNoticeData((prev) => ({ ...prev, pdfUrl, pdfFileName: file.name })))
+      .catch((err) => {
+        console.error(err);
+        alert('PDF upload failed. Please try again.');
+      });
   };
 
   // Add Notice
@@ -1435,48 +1331,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleNewsImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewsImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const rawUrl = reader.result as string;
-        try {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxDim = 800;
-            let width = img.width;
-            let height = img.height;
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
-            }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
-              const compressedUrl = canvas.toDataURL('image/jpeg', 0.82);
-              setNewsFormData((prev) => ({ ...prev, imageUrl: compressedUrl }));
-              return;
-            }
-            setNewsFormData((prev) => ({ ...prev, imageUrl: rawUrl }));
-          };
-          img.onerror = () => {
-            setNewsFormData((prev) => ({ ...prev, imageUrl: rawUrl }));
-          };
-          img.src = rawUrl;
-        } catch {
-          setNewsFormData((prev) => ({ ...prev, imageUrl: rawUrl }));
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const imageUrl = await uploadToCloudinary(await optimizeImage(file, { maxDim: 1200 }), 'alumni-jnu/news');
+      setNewsFormData((prev) => ({ ...prev, imageUrl }));
+    } catch (err) {
+      console.error(err);
+      alert('Image upload failed. Please try again.');
     }
   };
 
@@ -2760,17 +2623,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-2">
                     <p className="text-emerald-900/90 leading-relaxed font-medium">
                       {language === 'bn'
-                        ? 'এই তালিকায় অনুমোদিত অ্যালামনাই সদস্যদের তথ্য সংরক্ষিত রয়েছে। এখান থেকে সদস্যপদ নিশ্চিতকরণ এসএমএস পাঠানো যাবে এবং আবেদনপত্র ও সনদ ভিউ বা প্রিন্ট করা যাবে।'
-                        : 'These members have verified payment and approved status. You can send approval confirmation SMS, view applications, and print certificates.'}
+                        ? 'এই তালিকায় অনুমোদিত অ্যালামনাই সদস্যদের তথ্য সংরক্ষিত রয়েছে। এখান থেকে আবেদনপত্র ও সনদ ভিউ বা প্রিন্ট করা যাবে।'
+                        : 'These members have verified payment and approved status. You can view applications, and print certificates.'}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('sms')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-amber-300" />
-                      <span>{language === 'bn' ? 'এসএমএস বডি টেক্সট পরিবর্তন / কাস্টমাইজ করুন' : 'Edit SMS Body Text'}</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -3254,15 +3109,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   </>
                                 ) : (
                                   <>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSendCardSMS(m)}
-                                      disabled={sendingSmsId === m.id}
-                                      className="p-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-50 transition-colors cursor-pointer inline-flex items-center"
-                                      title={language === 'bn' ? 'সদস্যকে নিশ্চিতকরণ এসএমএস পাঠান' : 'Send Confirmation SMS to Member'}
-                                    >
-                                      <MessageSquare className={`w-4 h-4 ${sendingSmsId === m.id ? 'animate-spin' : ''}`} />
-                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => setSelectedMember(m)}

@@ -40,6 +40,7 @@ import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
 import jnuBotanyLogo from '../../assets/images/jnu_botany_alumni_logo.jpg';
 import { BATCH_SESSION_LIST } from '../../data/batchSessionData';
+import { optimizeImage, uploadToCloudinary } from '../../lib/cloudinary';
 
 interface PaymentPageProps {
   language: 'bn' | 'en';
@@ -285,14 +286,14 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
-  const handleSlipUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSlipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSlipPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      setSlipPreview(await uploadToCloudinary(await optimizeImage(file, { maxDim: 1600 }), 'alumni-jnu/payment-slips'));
+    } catch (err) {
+      console.error(err);
+      alert('Slip upload failed. Please try again.');
     }
   };
 
