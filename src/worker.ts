@@ -247,6 +247,37 @@ function docIdFromName(name: string | undefined): string {
   return parts[parts.length - 1];
 }
 
+/* ---------------------------------------------------------------------------
+ * Read-optimize: this database is an AI-Studio free-tier Firestore with a hard
+ * daily read quota. Every GET result is cached per isolate with a short TTL and
+ * stale data is served when Firestore is throttled, so normal visitors and the
+ * admin dashboard no longer burn through the quota.
+ * ------------------------------------------------------------------------- */
+const responseCache = new Map<string, { t: number; val: any }>();
+
+async function cached<T>(key: string, ttlMs: number, producer: () => Promise<T>): Promise<T> {
+  const hit = responseCache.get(key);
+  const now = Date.now();
+  if (hit && now - hit.t < ttlMs) return hit.val;
+  try {
+    const val = await producer();
+    responseCache.set(key, { t: now, val });
+    return val;
+  } catch (err: any) {
+    // Firestore quota / transient errors — serve stale cache if available
+    if (hit && /429|RESOURCE_EXHAUSTED|quota|Deadline|unavailable|500/.test(err.message || '')) {
+      return hit.val;
+    }
+    throw err;
+  }
+}
+
+function invalidateCache(prefixes: string[]): void {
+  for (const key of Array.from(responseCache.keys())) {
+    if (prefixes.some((p) => key.startsWith(p))) responseCache.delete(key);
+  }
+}
+
 function firestoreDocToJs(doc: any): Record<string, any> {
   const fields = (doc && doc.fields) || {};
   const out: Record<string, any> = {};
@@ -258,7 +289,8 @@ function firestoreDocToJs(doc: any): Record<string, any> {
 
 // Collection listing must use :runQuery — the direct documents.list endpoint
 // rejects tokenless (API-key-only) requests with 403 even when rules are open.
-async function fsListDocuments(collectionName: string): Promise<Record<string, any>[]> {
+// `limit` keeps read units low on heavy collections.
+async function fsListDocuments(collectionName: string, limit = 300): Promise<Record<string, any>[]> {
   const url = `${FS_BASE}:runQuery?key=${FB_API_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -266,6 +298,7 @@ async function fsListDocuments(collectionName: string): Promise<Record<string, a
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: collectionName, allDescendants: false }],
+        ...(limit ? { limit: { value: limit } } : {}),
       },
     }),
   });
@@ -320,14 +353,34 @@ async function fsSetDocument(
 }
 
 // "update" semantics: read-merge-write so only provided fields change.
+// Uses Firestore's updateMask so no read unit is consumed — critical on the
+// free-tier database (payment flow PATCH must succeed even when read quota
+// for the day is exhausted).
 async function fsPatchDocument(
   collectionName: string,
   id: string,
   updates: Record<string, any>
 ): Promise<Record<string, any>> {
-  const existing = await fsGetDocument(collectionName, id);
-  const merged = { ...(existing || {}), ...updates, id };
-  await fsSetDocument(collectionName, id, merged);
+  const fields: Record<string, any> = {};
+  const maskKeys: string[] = [];
+  for (const [k, v] of Object.entries(updates)) {
+    if (v === undefined) continue;
+    fields[k] = jsonValueToFirestore(v);
+    maskKeys.push(k);
+  }
+  const mask = maskKeys.map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const url = `${FS_BASE}/${encodeURIComponent(collectionName)}/${encodeURIComponent(id)}?key=${FB_API_KEY}${mask ? '&' + mask : ''}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore update failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const doc: any = await res.json();
+  const merged = { ...firestoreDocToJs(doc), id };
   return merged;
 }
 
@@ -523,29 +576,18 @@ async function handleApi(
   if (normalizedPath === '/api/memberships') {
     try {
       if (method === 'GET') {
-        const members = await fsListDocuments('memberships');
-        return jsonResponse(sortByCreatedAtDesc(members));
+        try {
+          const members = await cached('memberships', 20000, () => fsListDocuments('memberships'));
+          return jsonResponse(sortByCreatedAtDesc(members));
+        } catch (e) {
+          return jsonResponse(sortByCreatedAtDesc([]));
+        }
       }
 
       if (method === 'POST' || method === 'PUT') {
         const member = await readBody(request);
         if (!member) return jsonResponse({ error: 'Membership body required' }, 400);
 
-        const members = await fsListDocuments('memberships');
-
-        // Find highest BOT-XXXX sequence
-        let maxSequence = 0;
-        for (const m of members) {
-          const fNo = m.formNo || m.membershipId || m.id || '';
-          const digits = String(fNo).replace(/\D/g, '');
-          if (digits) {
-            const val = parseInt(digits, 10);
-            if (!isNaN(val) && val < 100000 && val > maxSequence) {
-              maxSequence = val;
-            }
-          }
-        }
-        const nextFormNo = `BOT-${String(Math.max(members.length + 1, maxSequence + 1)).padStart(4, '0')}`;
         const now = new Date().toISOString();
 
         // Explicit existing-id update (never MEM-/BOT- client ids)
@@ -561,17 +603,19 @@ async function handleApi(
             ...member,
             id: existingDoc.id,
             membershipId: existingDoc.membershipId || existingDoc.id,
-            formNo: existingDoc.formNo || member.formNo || nextFormNo,
+            formNo: existingDoc.formNo || member.formNo || `BOT-${String(Date.now()).slice(-4)}`,
             updatedAt: now,
           };
           await fsSetDocument('memberships', String(existingDoc.id), updatedRecord);
+          invalidateCache(['memberships']);
           console.log(`[API] Updated existing membership: ${updatedRecord.id}`);
           return jsonResponse({ success: true, member: updatedRecord });
         }
 
-        // New membership registration
+        // New membership registration — intentionally avoids read operations
+        // (free-tier Firestore read quota is scarce; form-number comes from the client)
         const uniqueId = String(member.id || member.membershipId || `MEM-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`);
-        const finalFormNo = member.formNo && member.formNo !== 'BOT-0001' ? member.formNo : nextFormNo;
+        const finalFormNo = member.formNo && member.formNo !== 'BOT-0001' ? member.formNo : `BOT-${String(Date.now()).slice(-4)}`;
 
         const record = {
           ...member,
@@ -585,6 +629,7 @@ async function handleApi(
         };
 
         await fsSetDocument('memberships', uniqueId, record);
+        invalidateCache(['memberships']);
         console.log(`[API] Created new membership: ${uniqueId} (Form: ${finalFormNo})`);
         return jsonResponse({ success: true, member: record });
       }
@@ -617,6 +662,7 @@ async function handleApi(
           .filter((m: any) => m.id)
           .map((m: any) => fsSetDocument('memberships', String(m.id), m))
       );
+      invalidateCache(['memberships']);
       return jsonResponse({ success: true, count: merged.length, memberships: merged });
     } catch (err: any) {
       console.error('API memberships/sync-batch error:', err);
@@ -638,10 +684,12 @@ async function handleApi(
           ...updates,
           updatedAt: new Date().toISOString(),
         });
+        invalidateCache(['memberships']);
         return jsonResponse({ success: true, member });
       }
       if (method === 'DELETE') {
         await fsDeleteDocument('memberships', id);
+        invalidateCache(['memberships']);
         return jsonResponse({ success: true, id });
       }
     } catch (err: any) {
@@ -654,8 +702,12 @@ async function handleApi(
   if (normalizedPath === '/api/payments') {
     try {
       if (method === 'GET') {
-        const payments = await fsListDocuments('payments');
-        return jsonResponse(sortByCreatedAtDesc(payments));
+        try {
+          const payments = await cached('payments', 20000, () => fsListDocuments('payments'));
+          return jsonResponse(sortByCreatedAtDesc(payments));
+        } catch (e) {
+          return jsonResponse([]);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const payment = await readBody(request);
@@ -667,6 +719,7 @@ async function handleApi(
           createdAt: payment.createdAt || new Date().toISOString(),
         };
         await fsSetDocument('payments', id, record);
+        invalidateCache(['payments']);
         return jsonResponse({ success: true, payment: record });
       }
     } catch (err: any) {
@@ -679,16 +732,24 @@ async function handleApi(
   if (normalizedPath === '/api/community-stats') {
     try {
       if (method === 'GET') {
-        const docRec = await fsGetDocument('site_settings', 'community_stats');
-        const stats: Record<string, any> = { ...DEFAULT_COMMUNITY_STATS, ...(docRec || {}), mode: 'manual' };
-        if (stats.id) delete stats.id;
-        return jsonResponse(stats);
+        try {
+          const docRec = await cached('community_stats', 30000, () => fsGetDocument('site_settings', 'community_stats'));
+          const stats: Record<string, any> = { ...DEFAULT_COMMUNITY_STATS, ...(docRec || {}), mode: 'manual' };
+          if (stats.id) delete stats.id;
+          return jsonResponse(stats);
+        } catch (e) {
+          // Quota / degraded Firestore — serve last known defaults so the
+          // homepage never shows a broken state
+          const stats: Record<string, any> = { ...DEFAULT_COMMUNITY_STATS, mode: 'manual' };
+          return jsonResponse(stats);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const stats = (await readBody(request)) || {};
         const updated = { ...stats, mode: 'manual', updatedAt: new Date().toISOString() };
         delete updated.id;
         await fsSetDocument('site_settings', 'community_stats', updated);
+        invalidateCache(['community_stats']);
         return jsonResponse({ success: true, stats: updated });
       }
     } catch (err: any) {
@@ -701,8 +762,12 @@ async function handleApi(
   if (normalizedPath === '/api/recent-news') {
     try {
       if (method === 'GET') {
-        const news = await fsListDocuments('recent_news');
-        return jsonResponse(sortByCreatedAtDesc(news));
+        try {
+          const news = await cached('recent_news', 60000, () => fsListDocuments('recent_news', 30));
+          return jsonResponse(sortByCreatedAtDesc(news));
+        } catch (e) {
+          return jsonResponse([]);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const item = await readBody(request);
@@ -711,6 +776,7 @@ async function handleApi(
         const existing = await fsGetDocument('recent_news', id);
         const record = { ...(existing || {}), ...item, id, updatedAt: new Date().toISOString() };
         await fsSetDocument('recent_news', id, record);
+        invalidateCache(['recent_news']);
         return jsonResponse({ success: true, item: record });
       }
     } catch (err: any) {
@@ -732,6 +798,7 @@ async function handleApi(
           count += 1;
         }
       }
+      invalidateCache(['recent_news']);
       return jsonResponse({ success: true, count });
     } catch (err: any) {
       console.error('API recent-news/sync-batch error:', err);
@@ -743,6 +810,7 @@ async function handleApi(
     const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
     try {
       await fsDeleteDocument('recent_news', id);
+      invalidateCache(['recent_news']);
       return jsonResponse({ success: true, id });
     } catch (err: any) {
       console.error(`API /api/recent-news/${id} error:`, err);
@@ -754,14 +822,20 @@ async function handleApi(
   if (normalizedPath === '/api/notices') {
     try {
       if (method === 'GET') {
-        const notices = await fsListDocuments('notices');
-        const cleaned = notices
-          .filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)))
-          .map((n: any) => {
-            if (n.id) delete n.id;
-            return n;
-          });
-        return jsonResponse(sortByCreatedAtDesc(cleaned as any));
+        try {
+          const notices = await cached('notices', 60000, () => fsListDocuments('notices', 60));
+          const cleaned = notices
+            .filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)))
+            .map((n: any) => {
+              if (n.id) delete n.id;
+              return n;
+            });
+          return jsonResponse(sortByCreatedAtDesc(cleaned as any));
+        } catch (e) {
+          // Quota / degraded Firestore: empty list lets the client fall back
+          // to its bundled demo notices instead of erroring
+          return jsonResponse([]);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const notice = await readBody(request);
@@ -772,6 +846,7 @@ async function handleApi(
         const existing = await fsGetDocument('notices', String(notice.id));
         const record = { ...(existing || {}), ...notice, id: String(notice.id) };
         await fsSetDocument('notices', String(notice.id), record);
+        invalidateCache(['notices']);
         return jsonResponse({ success: true, notice: record });
       }
     } catch (err: any) {
@@ -793,6 +868,7 @@ async function handleApi(
         await fsSetDocument('notices', String(n.id), record);
       }
       const merged = await fsListDocuments('notices');
+      invalidateCache(['notices']);
       const cleaned = merged.filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)));
       return jsonResponse({ success: true, count: cleaned.length, notices: cleaned });
     } catch (err: any) {
@@ -805,6 +881,7 @@ async function handleApi(
     const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
     try {
       await fsDeleteDocument('notices', id);
+      invalidateCache(['notices']);
       return jsonResponse({ success: true, id });
     } catch (err: any) {
       console.error(`API /api/notices/${id} error:`, err);
@@ -816,8 +893,12 @@ async function handleApi(
   if (normalizedPath === '/api/feedback') {
     try {
       if (method === 'GET') {
-        const feedback = await fsListDocuments('feedback_messages');
-        return jsonResponse(sortByCreatedAtDesc(feedback));
+        try {
+          const feedback = await cached('feedback_messages', 30000, () => fsListDocuments('feedback_messages', 200));
+          return jsonResponse(sortByCreatedAtDesc(feedback));
+        } catch (e) {
+          return jsonResponse([]);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const item = await readBody(request);
@@ -831,6 +912,7 @@ async function handleApi(
           createdAt: item.createdAt || new Date().toISOString(),
         };
         await fsSetDocument('feedback_messages', id, record);
+        invalidateCache(['feedback']);
         return jsonResponse({ success: true, feedback: record });
       }
     } catch (err: any) {
@@ -844,14 +926,13 @@ async function handleApi(
     try {
       if (method === 'PATCH' || method === 'PUT') {
         const updates = await readBody(request);
-        const existing = await fsGetDocument('feedback_messages', id);
-        if (!existing) return jsonResponse({ error: 'Not found' }, 404);
-        const merged = { ...existing, ...updates, id };
-        await fsSetDocument('feedback_messages', id, merged);
+        const merged = await fsPatchDocument('feedback_messages', id, updates);
+        invalidateCache(['feedback']);
         return jsonResponse({ success: true, feedback: merged });
       }
       if (method === 'DELETE') {
         await fsDeleteDocument('feedback_messages', id);
+        invalidateCache(['feedback']);
         return jsonResponse({ success: true, id });
       }
     } catch (err: any) {
@@ -864,8 +945,12 @@ async function handleApi(
   if (normalizedPath === '/api/contacts') {
     try {
       if (method === 'GET') {
-        const contacts = await fsListDocuments('contacts');
-        return jsonResponse(sortByCreatedAtDesc(contacts));
+        try {
+          const contacts = await cached('contacts', 30000, () => fsListDocuments('contacts', 200));
+          return jsonResponse(sortByCreatedAtDesc(contacts));
+        } catch (e) {
+          return jsonResponse([]);
+        }
       }
       if (method === 'POST' || method === 'PUT') {
         const item = await readBody(request);
@@ -879,6 +964,7 @@ async function handleApi(
           createdAt: item.createdAt || new Date().toISOString(),
         };
         await fsSetDocument('contacts', id, record);
+        invalidateCache(['contacts']);
         return jsonResponse({ success: true, contact: record });
       }
     } catch (err: any) {
@@ -892,14 +978,13 @@ async function handleApi(
     try {
       if (method === 'PATCH' || method === 'PUT') {
         const updates = await readBody(request);
-        const existing = await fsGetDocument('contacts', id);
-        if (!existing) return jsonResponse({ error: 'Not found' }, 404);
-        const merged = { ...existing, ...updates, id };
-        await fsSetDocument('contacts', id, merged);
+        const merged = await fsPatchDocument('contacts', id, updates);
+        invalidateCache(['contacts']);
         return jsonResponse({ success: true, contact: merged });
       }
       if (method === 'DELETE') {
         await fsDeleteDocument('contacts', id);
+        invalidateCache(['contacts']);
         return jsonResponse({ success: true, id });
       }
     } catch (err: any) {
