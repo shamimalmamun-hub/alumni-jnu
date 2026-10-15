@@ -4,8 +4,21 @@ export interface Env {
   SMS_SENDER_ID?: string;
   SMS_API_URL?: string;
   SMS_PROVIDER?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
   ASSETS?: { fetch: (req: Request) => Promise<Response> };
 }
+
+/* ---------------------------------------------------------------------------
+ * Firebase (Firestore REST) central storage.
+ * Prod runs on Cloudflare Worker with no Node filesystem, so all /api/* data
+ * endpoints are backed by the public Firestore REST API. Security rules are
+ * open ("allow read, write: if true"), so the web API key is sufficient.
+ * ------------------------------------------------------------------------- */
+const FB_PROJECT_ID = 'academic-domain-2rr5c';
+const FB_API_KEY = 'AIzaSyA8INm0h9iUN7Lleids_AUn1AzHstLhISg';
+const FB_DB_ID = 'ai-studio-botanyalumniasso-31f95de5-d295-4aaa-bb38-c1987454f637';
+const FS_BASE = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT_ID}/databases/${FB_DB_ID}/documents`;
 
 function normalizeBDPhone(phone: string): { local: string; withCountry: string } {
   const digitsOnly = String(phone || '').replace(/[^0-9]/g, '');
@@ -121,6 +134,785 @@ async function sendSMSWithEnv({
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Resend email (parity with Express server /api/send-email)
+ * ------------------------------------------------------------------------- */
+async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  from,
+  env,
+}: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+  from?: string;
+  env: Env;
+}): Promise<{ success: boolean; data?: any; error?: string }> {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[Resend Email] RESEND_API_KEY is not configured in environment.');
+    return { success: false, error: 'RESEND_API_KEY environment variable is not configured.' };
+  }
+
+  try {
+    const defaultSender = 'Botany Alumni Association <onboarding@resend.dev>';
+    const sender = from || env.RESEND_FROM_EMAIL || defaultSender;
+
+    const result = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: sender,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    let data: any = null;
+    try { data = await result.json(); } catch {}
+
+    if (!result.ok) {
+      console.error('[Resend Email] Error from Resend API:', data);
+      return { success: false, error: (data && (data.message || data.error)) || 'Failed to send email via Resend' };
+    }
+
+    console.log('[Resend Email] Email sent successfully! ID:', data && data.id);
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('[Resend Email] Send Error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Firestore REST helpers: JSON <-> Firestore typed values
+ * ------------------------------------------------------------------------- */
+function jsonValueToFirestore(value: any): any {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (typeof value === 'string') return { stringValue: value };
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map((v) => jsonValueToFirestore(v)) } };
+  }
+  if (typeof value === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      fields[k] = jsonValueToFirestore(v);
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(value) };
+}
+
+function firestoreValueToJs(fieldValue: any): any {
+  if (!fieldValue || typeof fieldValue !== 'object') return null;
+  if ('nullValue' in fieldValue) return null;
+  if ('booleanValue' in fieldValue) return fieldValue.booleanValue;
+  if ('integerValue' in fieldValue) return parseInt(fieldValue.integerValue, 10);
+  if ('doubleValue' in fieldValue) return fieldValue.doubleValue;
+  if ('stringValue' in fieldValue) return fieldValue.stringValue;
+  if ('timestampValue' in fieldValue) return fieldValue.timestampValue;
+  if ('arrayValue' in fieldValue) {
+    return ((fieldValue.arrayValue && fieldValue.arrayValue.values) || []).map(firestoreValueToJs);
+  }
+  if ('mapValue' in fieldValue) {
+    const fields = (fieldValue.mapValue && fieldValue.mapValue.fields) || {};
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(fields)) {
+      out[k] = firestoreValueToJs(v);
+    }
+    return out;
+  }
+  if ('bytesValue' in fieldValue) return fieldValue.bytesValue;
+  if ('referenceValue' in fieldValue) return fieldValue.referenceValue;
+  if ('geoPointValue' in fieldValue) return fieldValue.geoPointValue;
+  return null;
+}
+
+function docIdFromName(name: string | undefined): string {
+  if (!name) return '';
+  const parts = name.split('/');
+  return parts[parts.length - 1];
+}
+
+function firestoreDocToJs(doc: any): Record<string, any> {
+  const fields = (doc && doc.fields) || {};
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    out[k] = firestoreValueToJs(v);
+  }
+  return out;
+}
+
+// Collection listing must use :runQuery — the direct documents.list endpoint
+// rejects tokenless (API-key-only) requests with 403 even when rules are open.
+async function fsListDocuments(collectionName: string): Promise<Record<string, any>[]> {
+  const url = `${FS_BASE}:runQuery?key=${FB_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: collectionName, allDescendants: false }],
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore list failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const data: any = await res.json();
+  const rows = Array.isArray(data) ? data : [];
+  const docs = rows
+    .map((row: any) => row.document)
+    .filter(Boolean);
+  return docs.map((doc: any) => ({
+    ...firestoreDocToJs(doc),
+    id: docIdFromName(doc.name),
+  }));
+}
+
+async function fsGetDocument(collectionName: string, id: string): Promise<Record<string, any> | null> {
+  const url = `${FS_BASE}/${encodeURIComponent(collectionName)}/${encodeURIComponent(id)}?key=${FB_API_KEY}`;
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore get failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const doc: any = await res.json();
+  return { ...firestoreDocToJs(doc), id: docIdFromName(doc.name) };
+}
+
+// "set" semantics: creates when missing, otherwise overwrites whole doc.
+async function fsSetDocument(
+  collectionName: string,
+  id: string,
+  data: Record<string, any>
+): Promise<void> {
+  const fields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === undefined) continue;
+    fields[k] = jsonValueToFirestore(v);
+  }
+  const url = `${FS_BASE}/${encodeURIComponent(collectionName)}/${encodeURIComponent(id)}?key=${FB_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore write failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+}
+
+// "update" semantics: read-merge-write so only provided fields change.
+async function fsPatchDocument(
+  collectionName: string,
+  id: string,
+  updates: Record<string, any>
+): Promise<Record<string, any>> {
+  const existing = await fsGetDocument(collectionName, id);
+  const merged = { ...(existing || {}), ...updates, id };
+  await fsSetDocument(collectionName, id, merged);
+  return merged;
+}
+
+async function fsDeleteDocument(collectionName: string, id: string): Promise<void> {
+  const url = `${FS_BASE}/${encodeURIComponent(collectionName)}/${encodeURIComponent(id)}?key=${FB_API_KEY}`;
+  await fetch(url, { method: 'DELETE' });
+}
+
+function sortByCreatedAtDesc<T extends Record<string, any>>(list: T[]): T[] {
+  return list.sort((a, b) => {
+    const tA = a.createdAt ? new Date(String(a.createdAt)).getTime() : 0;
+    const tB = b.createdAt ? new Date(String(b.createdAt)).getTime() : 0;
+    return tB - tA;
+  });
+}
+
+function isDemoNoticeId(id: string): boolean {
+  if (!id) return false;
+  return /^not-(0[1-9]|[12][0-9]|3[0-5])$/.test(id) || id.startsWith('not_demo_');
+}
+
+const DEFAULT_COMMUNITY_STATS = {
+  mode: 'manual',
+  totalMembers: 1240,
+  lifeMembers: 793,
+  committeeMembers: 35,
+  donorMembers: 29,
+  suffix: '+',
+  titleBn: 'আমাদের অ্যালামনাই পরিবার',
+  titleEn: 'Our Growing Community',
+  subBn: 'জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান বিভাগের সকল ব্যাচের প্রাক্তন ও বর্তমান সদস্যদের সম্মিলিত শক্তি',
+  subEn: 'Uniting generations of Botany Alumni from Jagannath University, Dhaka',
+};
+
+async function readBody(request: Request): Promise<any> {
+  try {
+    return await request.json();
+  } catch {
+    return {};
+  }
+}
+
+function jsonResponse(obj: any, status = 200): Response {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
+async function handleApi(
+  normalizedPath: string,
+  request: Request,
+  url: URL,
+  env: Env
+): Promise<Response> {
+  const method = request.method.toUpperCase();
+  const segments = normalizedPath.split('/').filter(Boolean); // e.g. ['api','memberships',':id']
+
+  /* ---------------------------------------------------------------- health */
+  if (normalizedPath === '/api/health') {
+    return jsonResponse({
+      status: 'ok',
+      smsConfigured: true,
+      smsProvider: (env.SMS_PROVIDER || 'bulksmsbd').toLowerCase(),
+      resendConfigured: Boolean(env.RESEND_API_KEY),
+      timestamp: new Date().toISOString(),
+      platform: 'cloudflare-worker',
+    });
+  }
+
+  /* ------------------------------------------------------------------- SMS */
+  if (normalizedPath === '/api/send-sms') {
+    try {
+      const body = await readBody(request);
+      const { mobile, name, amount, tranId, formNo, cardUrl, message: customMsg } = body;
+      const targetMobile = mobile || '';
+
+      if (!targetMobile) {
+        return jsonResponse({ success: false, error: 'Mobile number is required' }, 400);
+      }
+
+      const applicantName = (name && name !== 'Applicant' && name !== 'সদস্য') ? name : '';
+      const displayName = applicantName ? applicantName : 'সদস্য';
+      const formNoVal = formNo || body.formNo || '';
+      const linkToCard = cardUrl || (formNoVal ? `${url.origin}/card/${encodeURIComponent(formNoVal)}` : (tranId ? `${url.origin}/card/${encodeURIComponent(tranId)}` : `${url.origin}/card/BOTANY-ALUMNI`));
+
+      let msgToSend = (customMsg || '').trim();
+      if (!msgToSend) {
+        msgToSend = `অভিনন্দন ${displayName}! উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সদস্য নিবন্ধনে আপনার আবেদন ও ৳${amount || '৫০০'} ফি সফলভাবে গৃহীত হয়েছে (TrxID: ${tranId || 'N/A'})।`;
+      }
+
+      const smsResult = await sendSMSWithEnv({
+        mobile: targetMobile,
+        message: msgToSend,
+        env,
+      });
+
+      return jsonResponse({ ...smsResult, cardUrl: linkToCard });
+    } catch (err: any) {
+      return jsonResponse({ success: false, error: err.message }, 500);
+    }
+  }
+
+  if (normalizedPath === '/api/test-sms') {
+    const phone = url.searchParams.get('phone') || url.searchParams.get('mobile') || '01401996674';
+    const testMsg = `উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন: টেস্ট এসএমএস সফল হয়েছে! সময়: ${new Date().toLocaleTimeString('bn-BD')}`;
+    const result = await sendSMSWithEnv({
+      mobile: phone,
+      message: testMsg,
+      env,
+    });
+    return jsonResponse(result);
+  }
+
+  /* ----------------------------------------------------------------- email */
+  if (normalizedPath === '/api/send-email' && method === 'POST') {
+    try {
+      const body = await readBody(request);
+      const { to, subject, html, text, from, applicantName, formNo, amount, tranId } = body;
+
+      if (!to) {
+        return jsonResponse({ status: 'FAILED', message: 'Recipient email ("to") is required' }, 400);
+      }
+
+      let finalSubject = subject || 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন - নোটিফিকেশন';
+      let finalHtml = html;
+
+      if (!finalHtml) {
+        const name = applicantName || 'সম্মানিত সদস্য';
+        const txn = tranId || '';
+        finalHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff;">
+            <div style="background-color: #006a4e; padding: 20px; text-align: center; border-radius: 6px 6px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 20px;">উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন</h1>
+              <p style="color: #fcd34d; margin: 5px 0 0 0; font-size: 14px;">জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা</p>
+            </div>
+            <div style="padding: 20px; color: #1f2937; line-height: 1.6;">
+              <p>প্রিয় <strong>${name}</strong>,</p>
+              <p>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশনে আপনাকে স্বাগতম।</p>
+              ${formNo ? `<p><strong>আবেদন নম্বর (Form No):</strong> ${formNo}</p>` : ''}
+              ${amount ? `<p><strong>ফি:</strong> ৳${amount}</p>` : ''}
+              ${txn ? `<p><strong>ট্রানজেকশন আইডি:</strong> ${txn}</p>` : ''}
+              <p style="margin-top: 20px;">আপনার সার্বিক আপডেট ও অ্যালুমনাই তথ্য জানতে আমাদের ওয়েবসাইটে ভিজিট করুন।</p>
+            </div>
+            <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 6px 6px;">
+              © উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়
+            </div>
+          </div>
+        `;
+      }
+
+      const emailResult = await sendEmail({ to, subject: finalSubject, html: finalHtml, text, from, env });
+      return jsonResponse({
+        status: emailResult.success ? 'SUCCESS' : 'FAILED',
+        result: emailResult,
+      });
+    } catch (err: any) {
+      console.error('API /api/send-email Error:', err);
+      return jsonResponse({ status: 'FAILED', message: err.message }, 500);
+    }
+  }
+
+  if (normalizedPath === '/api/test-email') {
+    try {
+      const body = await readBody(request);
+      const to = url.searchParams.get('to') || url.searchParams.get('email') || body.to || body.email || 'hellothereshamim@gmail.com';
+      const testSubject = 'উদ্ভিদবিজ্ঞান অ্যালামনাই - Resend Email Test';
+      const testHtml = `
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #006a4e; border-radius: 8px; max-width: 500px;">
+          <h2 style="color: #006a4e; margin-top: 0;">Resend.com Email Integration Active!</h2>
+          <p>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয় সিস্টেম থেকে Resend.com এর মাধ্যমে ইমেইল সার্ভিস সফলভাবে সংযুক্ত করা হয়েছে।</p>
+          <p style="font-size: 12px; color: #666; margin-bottom: 0;">Timestamp: ${new Date().toISOString()}</p>
+        </div>
+      `;
+      const result = await sendEmail({ to, subject: testSubject, html: testHtml, env });
+      return jsonResponse({
+        status: result.success ? 'SUCCESS' : 'FAILED',
+        to,
+        result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return jsonResponse({ status: 'FAILED', error: err.message }, 500);
+    }
+  }
+
+  /* ----------------------------------------------------------- memberships */
+  if (normalizedPath === '/api/memberships') {
+    try {
+      if (method === 'GET') {
+        const members = await fsListDocuments('memberships');
+        return jsonResponse(sortByCreatedAtDesc(members));
+      }
+
+      if (method === 'POST' || method === 'PUT') {
+        const member = await readBody(request);
+        if (!member) return jsonResponse({ error: 'Membership body required' }, 400);
+
+        const members = await fsListDocuments('memberships');
+
+        // Find highest BOT-XXXX sequence
+        let maxSequence = 0;
+        for (const m of members) {
+          const fNo = m.formNo || m.membershipId || m.id || '';
+          const digits = String(fNo).replace(/\D/g, '');
+          if (digits) {
+            const val = parseInt(digits, 10);
+            if (!isNaN(val) && val < 100000 && val > maxSequence) {
+              maxSequence = val;
+            }
+          }
+        }
+        const nextFormNo = `BOT-${String(Math.max(members.length + 1, maxSequence + 1)).padStart(4, '0')}`;
+        const now = new Date().toISOString();
+
+        // Explicit existing-id update (never MEM-/BOT- client ids)
+        let requestedId = member.id || member.membershipId;
+        let existingDoc: Record<string, any> | null = null;
+        if (requestedId && String(requestedId).length > 5 && !String(requestedId).startsWith('MEM-') && !String(requestedId).startsWith('BOT-')) {
+          existingDoc = await fsGetDocument('memberships', String(requestedId));
+        }
+
+        if (existingDoc) {
+          const updatedRecord = {
+            ...existingDoc,
+            ...member,
+            id: existingDoc.id,
+            membershipId: existingDoc.membershipId || existingDoc.id,
+            formNo: existingDoc.formNo || member.formNo || nextFormNo,
+            updatedAt: now,
+          };
+          await fsSetDocument('memberships', String(existingDoc.id), updatedRecord);
+          console.log(`[API] Updated existing membership: ${updatedRecord.id}`);
+          return jsonResponse({ success: true, member: updatedRecord });
+        }
+
+        // New membership registration
+        const uniqueId = String(member.id || member.membershipId || `MEM-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`);
+        const finalFormNo = member.formNo && member.formNo !== 'BOT-0001' ? member.formNo : nextFormNo;
+
+        const record = {
+          ...member,
+          id: uniqueId,
+          membershipId: member.membershipId || uniqueId,
+          formNo: finalFormNo,
+          status: member.status || 'pending',
+          paymentStatus: member.paymentStatus || 'pending',
+          createdAt: member.createdAt || now,
+          updatedAt: now,
+        };
+
+        await fsSetDocument('memberships', uniqueId, record);
+        console.log(`[API] Created new membership: ${uniqueId} (Form: ${finalFormNo})`);
+        return jsonResponse({ success: true, member: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/memberships error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'memberships' && segments[2] === 'sync-batch' && method === 'POST') {
+    try {
+      const { memberships } = await readBody(request);
+      if (!Array.isArray(memberships)) {
+        return jsonResponse({ error: 'Array of memberships is required' }, 400);
+      }
+      const current = await fsListDocuments('memberships');
+      const map = new Map<string, any>(current.map((m: any) => [m.id || m.membershipId, m]));
+
+      for (const m of memberships) {
+        if (m && (m.id || m.membershipId || m.formNo)) {
+          const key = String(m.id || m.membershipId || m.formNo);
+          const existing = map.get(key);
+          map.set(key, existing ? { ...existing, ...m } : m);
+        }
+      }
+
+      const merged = sortByCreatedAtDesc(Array.from(map.values()));
+      await Promise.all(
+        merged
+          .filter((m: any) => m.id)
+          .map((m: any) => fsSetDocument('memberships', String(m.id), m))
+      );
+      return jsonResponse({ success: true, count: merged.length, memberships: merged });
+    } catch (err: any) {
+      console.error('API memberships/sync-batch error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'memberships' && segments[2]) {
+    const id = decodeURIComponent(segments[2]);
+    try {
+      if (method === 'GET') {
+        const docRec = await fsGetDocument('memberships', id);
+        if (!docRec) return jsonResponse({ error: 'Not found' }, 404);
+        return jsonResponse(docRec);
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        const updates = await readBody(request);
+        const member = await fsPatchDocument('memberships', id, {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        });
+        return jsonResponse({ success: true, member });
+      }
+      if (method === 'DELETE') {
+        await fsDeleteDocument('memberships', id);
+        return jsonResponse({ success: true, id });
+      }
+    } catch (err: any) {
+      console.error(`API /api/memberships/${id} error:`, err);
+      return jsonResponse({ error: err.message }, err.message.includes('404') ? 404 : 500);
+    }
+  }
+
+  /* -------------------------------------------------------------- payments */
+  if (normalizedPath === '/api/payments') {
+    try {
+      if (method === 'GET') {
+        const payments = await fsListDocuments('payments');
+        return jsonResponse(sortByCreatedAtDesc(payments));
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const payment = await readBody(request);
+        if (!payment) return jsonResponse({ error: 'Payment body required' }, 400);
+        const id = String(payment.id || payment.paymentDocId || `PAY-${Date.now()}`);
+        const record = {
+          ...payment,
+          id,
+          createdAt: payment.createdAt || new Date().toISOString(),
+        };
+        await fsSetDocument('payments', id, record);
+        return jsonResponse({ success: true, payment: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/payments error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* --------------------------------------------------------- community-stats */
+  if (normalizedPath === '/api/community-stats') {
+    try {
+      if (method === 'GET') {
+        const docRec = await fsGetDocument('site_settings', 'community_stats');
+        const stats: Record<string, any> = { ...DEFAULT_COMMUNITY_STATS, ...(docRec || {}), mode: 'manual' };
+        if (stats.id) delete stats.id;
+        return jsonResponse(stats);
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const stats = (await readBody(request)) || {};
+        const updated = { ...stats, mode: 'manual', updatedAt: new Date().toISOString() };
+        delete updated.id;
+        await fsSetDocument('site_settings', 'community_stats', updated);
+        return jsonResponse({ success: true, stats: updated });
+      }
+    } catch (err: any) {
+      console.error('API /api/community-stats error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* ------------------------------------------------------------ recent-news */
+  if (normalizedPath === '/api/recent-news') {
+    try {
+      if (method === 'GET') {
+        const news = await fsListDocuments('recent_news');
+        return jsonResponse(sortByCreatedAtDesc(news));
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const item = await readBody(request);
+        if (!item) return jsonResponse({ error: 'Body required' }, 400);
+        const id = String(item.id || `NEWS-${Date.now()}`);
+        const existing = await fsGetDocument('recent_news', id);
+        const record = { ...(existing || {}), ...item, id, updatedAt: new Date().toISOString() };
+        await fsSetDocument('recent_news', id, record);
+        return jsonResponse({ success: true, item: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/recent-news error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'recent-news' && segments[2] === 'sync-batch' && method === 'POST') {
+    try {
+      const { items } = await readBody(request);
+      if (!Array.isArray(items)) return jsonResponse({ error: 'Array required' }, 400);
+      let count = 0;
+      for (const item of items) {
+        if (item && item.id) {
+          const existing = await fsGetDocument('recent_news', String(item.id));
+          const record = { ...(existing || {}), ...item, id: String(item.id), updatedAt: new Date().toISOString() };
+          await fsSetDocument('recent_news', String(item.id), record);
+          count += 1;
+        }
+      }
+      return jsonResponse({ success: true, count });
+    } catch (err: any) {
+      console.error('API recent-news/sync-batch error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'recent-news' && segments[2] && method === 'DELETE') {
+    const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
+    try {
+      await fsDeleteDocument('recent_news', id);
+      return jsonResponse({ success: true, id });
+    } catch (err: any) {
+      console.error(`API /api/recent-news/${id} error:`, err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* ---------------------------------------------------------------- notices */
+  if (normalizedPath === '/api/notices') {
+    try {
+      if (method === 'GET') {
+        const notices = await fsListDocuments('notices');
+        const cleaned = notices
+          .filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)))
+          .map((n: any) => {
+            if (n.id) delete n.id;
+            return n;
+          });
+        return jsonResponse(sortByCreatedAtDesc(cleaned as any));
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const notice = await readBody(request);
+        if (!notice || !notice.id) return jsonResponse({ error: 'Notice id is required' }, 400);
+        if (isDemoNoticeId(String(notice.id))) {
+          return jsonResponse({ success: true, ignored: true });
+        }
+        const existing = await fsGetDocument('notices', String(notice.id));
+        const record = { ...(existing || {}), ...notice, id: String(notice.id) };
+        await fsSetDocument('notices', String(notice.id), record);
+        return jsonResponse({ success: true, notice: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/notices error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'notices' && segments[2] === 'sync-batch' && method === 'POST') {
+    try {
+      const { notices } = await readBody(request);
+      if (!Array.isArray(notices)) {
+        return jsonResponse({ error: 'Array of notices is required' }, 400);
+      }
+      const valid = notices.filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)));
+      for (const n of valid) {
+        const existing = await fsGetDocument('notices', String(n.id));
+        const record = { ...(existing || {}), ...n, id: String(n.id) };
+        await fsSetDocument('notices', String(n.id), record);
+      }
+      const merged = await fsListDocuments('notices');
+      const cleaned = merged.filter((n: any) => n && n.id && !isDemoNoticeId(String(n.id)));
+      return jsonResponse({ success: true, count: cleaned.length, notices: cleaned });
+    } catch (err: any) {
+      console.error('API notices/sync-batch error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'notices' && segments[2] && method === 'DELETE') {
+    const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
+    try {
+      await fsDeleteDocument('notices', id);
+      return jsonResponse({ success: true, id });
+    } catch (err: any) {
+      console.error(`API /api/notices/${id} error:`, err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* --------------------------------------------------------------- feedback */
+  if (normalizedPath === '/api/feedback') {
+    try {
+      if (method === 'GET') {
+        const feedback = await fsListDocuments('feedback_messages');
+        return jsonResponse(sortByCreatedAtDesc(feedback));
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const item = await readBody(request);
+        if (!item) return jsonResponse({ error: 'Body required' }, 400);
+        const id = String(item.id || `FEED-${Date.now()}`);
+        const existing = await fsGetDocument('feedback_messages', id);
+        const record = {
+          ...(existing || {}),
+          ...item,
+          id,
+          createdAt: item.createdAt || new Date().toISOString(),
+        };
+        await fsSetDocument('feedback_messages', id, record);
+        return jsonResponse({ success: true, feedback: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/feedback error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'feedback' && segments[2]) {
+    const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
+    try {
+      if (method === 'PATCH' || method === 'PUT') {
+        const updates = await readBody(request);
+        const existing = await fsGetDocument('feedback_messages', id);
+        if (!existing) return jsonResponse({ error: 'Not found' }, 404);
+        const merged = { ...existing, ...updates, id };
+        await fsSetDocument('feedback_messages', id, merged);
+        return jsonResponse({ success: true, feedback: merged });
+      }
+      if (method === 'DELETE') {
+        await fsDeleteDocument('feedback_messages', id);
+        return jsonResponse({ success: true, id });
+      }
+    } catch (err: any) {
+      console.error(`API /api/feedback/${id} error:`, err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* --------------------------------------------------------------- contacts */
+  if (normalizedPath === '/api/contacts') {
+    try {
+      if (method === 'GET') {
+        const contacts = await fsListDocuments('contacts');
+        return jsonResponse(sortByCreatedAtDesc(contacts));
+      }
+      if (method === 'POST' || method === 'PUT') {
+        const item = await readBody(request);
+        if (!item) return jsonResponse({ error: 'Body required' }, 400);
+        const id = String(item.id || `CONT-${Date.now()}`);
+        const existing = await fsGetDocument('contacts', id);
+        const record = {
+          ...(existing || {}),
+          ...item,
+          id,
+          createdAt: item.createdAt || new Date().toISOString(),
+        };
+        await fsSetDocument('contacts', id, record);
+        return jsonResponse({ success: true, contact: record });
+      }
+    } catch (err: any) {
+      console.error('API /api/contacts error:', err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  if (segments[1] === 'contacts' && segments[2]) {
+    const id = decodeURIComponent(segments[2]).replace(/\?.*$/, '');
+    try {
+      if (method === 'PATCH' || method === 'PUT') {
+        const updates = await readBody(request);
+        const existing = await fsGetDocument('contacts', id);
+        if (!existing) return jsonResponse({ error: 'Not found' }, 404);
+        const merged = { ...existing, ...updates, id };
+        await fsSetDocument('contacts', id, merged);
+        return jsonResponse({ success: true, contact: merged });
+      }
+      if (method === 'DELETE') {
+        await fsDeleteDocument('contacts', id);
+        return jsonResponse({ success: true, id });
+      }
+    } catch (err: any) {
+      console.error(`API /api/contacts/${id} error:`, err);
+      return jsonResponse({ error: err.message }, 500);
+    }
+  }
+
+  /* ----------------------------------------------------------- unknown API */
+  console.log(`[Worker] Unhandled API route: ${method} ${normalizedPath}`);
+  return jsonResponse({ error: 'Not found', path: normalizedPath }, 404);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     const url = new URL(request.url);
@@ -139,72 +931,22 @@ export default {
       });
     }
 
-    // 1. Health check endpoint
-    if (normalizedPath === '/api/health') {
-      return new Response(JSON.stringify({ status: 'ok', time: new Date().toISOString(), platform: 'cloudflare-worker' }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
-
-    // 2. Direct SMS Dispatch API
-    if (normalizedPath === '/api/send-sms') {
+    // 1. All /api/* routes (health, SMS, email, memberships, payments, notices,
+    //    community-stats, recent-news, feedback, contacts) backed by Firestore
+    if (normalizedPath.startsWith('/api') && (
+      normalizedPath === '/api' ||
+      normalizedPath.startsWith('/api/') ||
+      normalizedPath.startsWith('/api')
+    )) {
       try {
-        let body: any = {};
-        try { body = await request.json(); } catch { body = {}; }
-        const { mobile, name, amount, tranId, formNo, cardUrl, message: customMsg } = body;
-        const targetMobile = mobile || '';
-
-        if (!targetMobile) {
-          return new Response(JSON.stringify({ success: false, error: 'Mobile number is required' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          });
-        }
-
-        const applicantName = (name && name !== 'Applicant' && name !== 'সদস্য') ? name : '';
-        const displayName = applicantName ? applicantName : 'সদস্য';
-        const formNoVal = formNo || body.formNo || '';
-        const linkToCard = cardUrl || (formNoVal ? `${url.origin}/card/${encodeURIComponent(formNoVal)}` : (tranId ? `${url.origin}/card/${encodeURIComponent(tranId)}` : `${url.origin}/card/BOTANY-ALUMNI`));
-
-        let msgToSend = (customMsg || '').trim();
-        if (!msgToSend) {
-          msgToSend = `অভিনন্দন ${displayName}! উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সদস্য নিবন্ধনে আপনার আবেদন ও ৳${amount || '৫০০'} ফি সফলভাবে গৃহীত হয়েছে (TrxID: ${tranId || 'N/A'})।`;
-        }
-
-        const smsResult = await sendSMSWithEnv({
-          mobile: targetMobile,
-          message: msgToSend,
-          env,
-        });
-
-        return new Response(JSON.stringify(smsResult), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return await handleApi(normalizedPath.replace(/\/$/, ''), request, url, env);
       } catch (err: any) {
-        return new Response(JSON.stringify({ success: false, error: err.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        console.error('[Worker] API handler error:', err);
+        return jsonResponse({ error: err.message || 'Internal API error' }, 500);
       }
     }
 
-    // 3. Test SMS endpoint
-    if (normalizedPath === '/api/test-sms') {
-      const phone = url.searchParams.get('phone') || url.searchParams.get('mobile') || '01401996674';
-      const testMsg = `উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন: টেস্ট এসএমএস সফল হয়েছে! সময়: ${new Date().toLocaleTimeString('bn-BD')}`;
-      const result = await sendSMSWithEnv({
-        mobile: phone,
-        message: testMsg,
-        env,
-      });
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
-
-    // 4. Serve static assets from ./dist if available
+    // 2. Serve static assets from ./dist if available
     if (env.ASSETS) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         const getRequest = new Request(request.url, {
