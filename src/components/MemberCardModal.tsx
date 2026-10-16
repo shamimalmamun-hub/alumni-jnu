@@ -33,6 +33,7 @@ export interface CardMemberData {
   userPhotoUrl?: string;
   status?: string;
   paymentStatus?: string;
+  paymentMethod?: string;
   feeAmount?: string;
 }
 
@@ -61,7 +62,16 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
   const displaySession = member.session || member.batch || '—';
   const displayMobile = member.mobile || '—';
   const displayAddress = member.currentAddress || member.presentAddress || member.district || 'জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা';
-  const displayTrx = member.transactionId || 'VERIFIED';
+  const rawTrx = (member.transactionId || '').trim().toUpperCase();
+  const isSentinelTrx = !rawTrx || rawTrx === 'PAID-CASH' || rawTrx === 'UNPAID' || rawTrx === 'VERIFIED';
+  const hasPaymentMethod = member.paymentMethod && member.paymentMethod !== 'Unpaid';
+  const displayTrx = isSentinelTrx
+    ? hasPaymentMethod
+      ? member.paymentMethod
+      : member.paymentStatus === 'paid'
+        ? 'Cash'
+        : 'Unpaid'
+    : member.transactionId;
 
   const isLifeMember =
     member.membershipType === 'life' ||
@@ -305,7 +315,7 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
               <span className="text-gray-500 font-medium">স্ট্যাটাস:</span>
               <span className="font-bold text-[#006a4e] flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#006a4e]" />
-                অনুমোদিত ও ভেরিফাইড
+                {member.status === 'pending' ? 'পর্যালোচনাধীন' : member.status === 'rejected' ? 'বাতিলকৃত' : 'অনুমোদিত ও ভেরিফাইড'}
               </span>
             </div>
           </div>

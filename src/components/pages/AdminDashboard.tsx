@@ -86,7 +86,11 @@ function buildBrandedEmailHtml(text: string): string {
       line
         ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; line-height: 1.6;">${line
             .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')}</p>`
+            .replace(/>/g, '&gt;')
+            .replace(
+              /(https?:\/\/[^\s<>"']+)/g,
+              '<a href="$1" style="color: #006a4e; font-weight: bold; text-decoration: underline; word-break: break-all;">$1</a>'
+            )}</p>`
         : '<div style="height: 8px;"></div>'
     )
     .join('');
@@ -102,6 +106,7 @@ function buildBrandedEmailHtml(text: string): string {
       </div>
       <div style="background-color: #f8fafc; padding: 16px 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
         <p style="margin: 0 0 4px 0;"><strong>উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়</strong></p>
+        <p style="margin: 0 0 4px 0;">Botany Alumni Association, Jagannath University</p>
         <p style="margin: 0;">© ${new Date().getFullYear()} Botany Alumni Association, JnU. All Rights Reserved.</p>
       </div>
     </div>
@@ -776,13 +781,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (!preset) return;
 
       const recipientName = member.applicantNameBn || member.fullName || 'সম্মানিত সদস্য';
+      const formNo = member.formNo || member.membershipId;
+      const cardLink = formNo ? `${window.location.origin}/card/${encodeURIComponent(formNo)}` : '';
       const text = formatCustomEmail(preset.template, {
         name: recipientName,
-        formNo: member.formNo || member.membershipId,
+        formNo,
         email: member.email,
         phone: member.phone || member.mobile,
         amount: member.feeAmount || (member.membershipType === 'life' ? '২৫০০' : '৫০০'),
         batch: member.bscSession || member.session,
+        cardLink,
       });
 
       const res = await fetch('/api/send-email', {
@@ -894,7 +902,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEmailSubject('উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন - নোটিশ ও সদস্য বার্তা');
     const recipientName = target.name || 'সম্মানিত সদস্য';
     const formRef = target.formNo ? ` (ফরম নং: ${target.formNo})` : '';
-    setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর পক্ষ থেকে আন্তরিক শুভেচ্ছা গ্রহণ করুন।${formRef}\n\n[এখানে আপনার কাঙ্ক্ষিত তথ্য বা বিশেষ দিকনির্দেশনা লিখুন]\n\nযে কোনো তথ্যের জন্য আমাদের ওয়েবসাইটে ভিজিট করতে পারেন অথবা সরাসরি ড্যাশবোর্ড মারফত যোগাযোগ বজায় রাখতে পারেন।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন\nজগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`);
+    setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর পক্ষ থেকে আন্তরিক শুভেচ্ছা গ্রহণ করুন।${formRef}\n\n[এখানে আপনার কাঙ্ক্ষিত তথ্য বা বিশেষ দিকনির্দেশনা লিখুন]\n\nযে কোনো তথ্যের জন্য আমাদের ওয়েবসাইটে ভিজিট করতে পারেন অথবা সরাসরি ড্যাশবোর্ড মারফত যোগাযোগ বজায় রাখতে পারেন।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন\nজগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`);
     setEmailSuccessMsg(null);
     setEmailErrMsg(null);
     setIsEmailModalOpen(true);
@@ -907,6 +916,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const formRef = emailTarget?.formNo ? ` (ফরম নং: ${emailTarget.formNo})` : '';
 
     if (template === 'approval') {
+      const cardLink = emailTarget?.formNo
+        ? `${window.location.origin}/card/${encodeURIComponent(emailTarget.formNo)}`
+        : '';
       setEmailSubject('অভিনন্দন! আপনার অ্যালামনাই সদস্যপদ আবেদন অনুমোদিত হয়েছে');
       setEmailBody(`প্রিয় ${recipientName},
 
@@ -917,7 +929,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 ফরম নং: ${emailTarget?.formNo || ''}${emailTarget?.phone ? `
 ফোন নাম্বার: ${emailTarget.phone}` : ''}
 
-এখন থেকে আপনি সেন্ট্রাল অ্যালামনাই নেটওয়ার্কের একজন নিবন্ধিত সদস্য। ওয়েবসাইট থেকে আপনার ডিজিটাল মেম্বারশিপ কার্ড ডাউনলোড করে নিতে পারেন।
+এখন থেকে আপনি সেন্ট্রাল অ্যালামনাই নেটওয়ার্কের একজন নিবন্ধিত সদস্য।${emailTarget?.formNo ? `
+
+নিচের লিংক থেকে আপনার ডিজিটাল মেম্বারশিপ কার্ড ডাউনলোড করে নিন—
+
+${cardLink}` : ' ওয়েবসাইট থেকে আপনার ডিজিটাল মেম্বারশিপ কার্ড ডাউনলোড করে নিতে পারেন।'}
 
 আমাদের সাথে যুক্ত থাকার জন্য ধন্যবাদ।
 
@@ -925,16 +941,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
 
-জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`);
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`);
     } else if (template === 'fee_receipt') {
       setEmailSubject('পেমেন্ট নিশ্চয়তা ও ফি প্রাপ্তি স্বীকার - উদ্ভিদবিজ্ঞান অ্যালামনাই');
-      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সদস্য নিবন্ধনে আপনার জমা দেওয়া আবেদন${formRef} ও সদস্যপদ ফি সফলভাবে গৃহীত হয়েছে।\n\nআপনার ডিজিটাল সদস্যপদ কার্ড ও পেমেন্ট রসিদ ওয়েবসাইট থেকে সরাসরি ডাউনলোড করতে পারবেন।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন\nজগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`);
+      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সদস্য নিবন্ধনে আপনার জমা দেওয়া আবেদন${formRef} ও সদস্যপদ ফি সফলভাবে গৃহীত হয়েছে।\n\nআপনার ডিজিটাল সদস্যপদ কার্ড ও পেমেন্ট রসিদ ওয়েবসাইট থেকে সরাসরি ডাউনলোড করতে পারবেন।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন\nজগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`);
     } else if (template === 'notice') {
       setEmailSubject('জরুরি নোটিশ - উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন');
-      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর সদস্যবৃন্দের অবগতির জন্য জানানো যাচ্ছে যে,\n\n[এখানে আপনার নোটিশ বা সভার বিবরণ লিখুন]\n\nআপনার সক্রিয় উপস্থিতি ও সহযোগিতা একান্ত কাম্য।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সেল`);
+      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর সদস্যবৃন্দের অবগতির জন্য জানানো যাচ্ছে যে,\n\n[এখানে আপনার নোটিশ বা সভার বিবরণ লিখুন]\n\nআপনার সক্রিয় উপস্থিতি ও সহযোগিতা একান্ত কাম্য।\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সেল
+Botany Alumni Association, Jagannath University`);
     } else {
       setEmailSubject('উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন - নোটিশ ও সদস্য বার্তা');
-      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর পক্ষ থেকে আন্তরিক শুভেচ্ছা গ্রহণ করুন।${formRef}\n\n[এখানে আপনার কাঙ্ক্ষিত বার্তা লিখুন]\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন`);
+      setEmailBody(`প্রিয় ${recipientName},\n\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এর পক্ষ থেকে আন্তরিক শুভেচ্ছা গ্রহণ করুন।${formRef}\n\n[এখানে আপনার কাঙ্ক্ষিত বার্তা লিখুন]\n\nধন্যবাদান্তে,\nউদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
+Botany Alumni Association, Jagannath University`);
     }
   };
 

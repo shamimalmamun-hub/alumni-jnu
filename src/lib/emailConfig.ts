@@ -51,6 +51,13 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
     example: '২০০৫-২০০৬ (১ম ব্যাচ)',
     descriptionBn: 'অনার্স বা মাস্টার্স ব্যাচ',
   },
+  {
+    key: '{cardLink}',
+    labelBn: 'সদস্য কার্ড ডাউনলোড লিংক',
+    labelEn: 'Member Card Download Link',
+    example: 'https://baajnu.bd/card/BOT-2026-0012',
+    descriptionBn: 'অনুমোদিত সদস্যের ডিজিটাল সদস্য কার্ড ডাউনলোড লিংক',
+  },
 ];
 
 export const DEFAULT_EMAIL_SUBJECT = 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন - গুরুত্বপূর্ণ নোটিশ ও সদস্য তথ্য';
@@ -66,7 +73,8 @@ export const DEFAULT_EMAIL_TEMPLATE =
 
 ধন্যবাদান্তে,
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
-জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`;
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`;
 
 export interface EmailPreset {
   id: string;
@@ -93,7 +101,11 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 ফরম নং: {formNo}
 ফোন নাম্বার: {phone}
 
-এখন থেকে আপনি সেন্ট্রাল অ্যালামনাই নেটওয়ার্কের একজন নিবন্ধিত সদস্য। ওয়েবসাইট থেকে আপনার ডিজিটাল মেম্বারশিপ কার্ড ডাউনলোড করে নিতে পারেন।
+এখন থেকে আপনি সেন্ট্রাল অ্যালামনাই নেটওয়ার্কের একজন নিবন্ধিত সদস্য।
+
+নিচের লিংক থেকে আপনার ডিজিটাল মেম্বারশিপ কার্ড ডাউনলোড করে নিন—
+
+{cardLink}
 
 আমাদের সাথে যুক্ত থাকার জন্য ধন্যবাদ।
 
@@ -101,7 +113,8 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
 
-জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`
   },
   {
     id: 'rejection_preset',
@@ -117,7 +130,8 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 
 ধন্যবাদান্তে,
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
-জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`,
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`,
   },
   {
     id: 'receipt_preset',
@@ -133,7 +147,8 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 
 ধন্যবাদান্তে,
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
-জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`,
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।
+Botany Alumni Association, Jagannath University`,
   },
   {
     id: 'notice_preset',
@@ -150,7 +165,8 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 আপনার সক্রিয় উপস্থিতি ও সর্বাত্মক সহযোগিতা একান্ত কাম্য।
 
 ধন্যবাদান্তে,
-উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সেল`,
+উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন সেল
+Botany Alumni Association, Jagannath University`,
   },
 ];
 
@@ -163,6 +179,7 @@ export function formatCustomEmail(
     phone?: string;
     amount?: string;
     batch?: string;
+    cardLink?: string;
   }
 ): string {
   let result = rawTemplate || '';
@@ -172,6 +189,7 @@ export function formatCustomEmail(
   result = result.replace(/\{phone\}/g, vars.phone || '01700000000');
   result = result.replace(/\{amount\}/g, vars.amount || '৫০০');
   result = result.replace(/\{batch\}/g, vars.batch || 'জবি ১ম ব্যাচ');
+  result = result.replace(/\{cardLink\}/g, vars.cardLink || '');
   return result;
 }
 
