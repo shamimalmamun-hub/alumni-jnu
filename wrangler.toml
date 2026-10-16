@@ -2,6 +2,9 @@ name = "alumni-jnu"
 main = "src/worker.ts"
 compatibility_date = "2026-08-25"
 
+# Serve on the production domain (zone must be on this Cloudflare account).
+routes = [{ pattern = "baajnu.bd", custom_domain = true }]
+
 [build]
 command = "npm run build"
 
@@ -18,7 +21,7 @@ exclude = ["*.map", "*.pdf", "*.jfif"]
 [[d1_databases]]
 binding = "DB"
 database_name = "alumni-jnu"
-database_id = "REPLACE_WITH_DATABASE_ID"
+database_id = "a874d508-6581-4237-9dd7-c808c4e4821a"
 migrations_dir = "migrations"
 
 [vars]
