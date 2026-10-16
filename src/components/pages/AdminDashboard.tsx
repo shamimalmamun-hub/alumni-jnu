@@ -62,7 +62,7 @@ import { publishNotice, removeNotice, subscribeNotices } from '../../utils/notic
 import { auth, googleProvider } from '../../lib/firebase';
 import { NEWS_POSTS, NewsPost } from '../../data/portalData';
 import { deleteDocument, listDocuments, setDocument, setPinToken, loginWithPin, updateDocument, watch } from '../../lib/db';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { BATCH_SESSION_LIST } from '../../data/batchSessionData';
 import { EmailTemplateSettings } from '../admin/EmailTemplateSettings';
 import { CommunityStatsAdminEditor } from '../admin/CommunityStatsAdminEditor';
@@ -449,9 +449,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     } catch (err) {
       console.error(err);
-      setAuthError(language === 'bn' ? 'গুগল সাইন-ইন ব্যর্থ হয়েছে।' : 'Google Sign-in failed.');
+      // iOS Safari frequently blocks popups and third-party cookie contexts —
+      // fall back to the full-page redirect flow, which works everywhere.
+      const code = (err as { code?: string })?.code || '';
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/popup-closed-by-user'
+      ) {
+        signInWithRedirect(auth, googleProvider).catch(() => {});
+        return;
+      }
+      setAuthError(language === 'bn' ? 'গুগল সাইন-ইন ব্যর্থ হয়েছে।' : 'Google Sign-in failed.');
     }
   };
+
+  // Complete the sign-in when returning from a signInWithRedirect flow (iOS Safari).
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setIsAuthenticated(true);
+          const user = {
+            name: result.user.displayName || 'উদ্ভিদবিজ্ঞান বিভাগীয় অ্যাডমিন',
+            email: result.user.email || 'admin@botany-alumni.org'
+          };
+          setAdminUser(user);
+          sessionStorage.setItem('botany_admin_auth', 'true');
+          sessionStorage.setItem('botany_admin_user', JSON.stringify(user));
+          showToast(language === 'bn' ? 'গুগল অ্যাকাউন্টে লগইন সফল হয়েছে!' : 'Google Login Successful!');
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -4207,8 +4238,7 @@ ${sMessage}`;
                               alt="Notice preview"
                               className="h-14 w-20 object-cover rounded-lg border border-emerald-200 cursor-pointer hover:opacity-90"
                               onClick={() => {
-                                const win = window.open();
-                                win?.document.write(`<img src="${n.imageUrl}" style="max-width:100%"/>`);
+                                window.open(n.imageUrl, '_blank');
                               }}
                               title="ছবি দেখতে ক্লিক করুন"
                             />
@@ -4822,9 +4852,7 @@ ${sMessage}`;
                                 type="button"
                                 onClick={() => {
                                   if (docData.startsWith('data:image/') || docData.startsWith('http')) {
-                                    const win = window.open();
-                                    if (win) {
-                                      win.document.write(`
+                                    const html = `
                                         <!DOCTYPE html>
                                         <html>
                                           <head>
@@ -4840,7 +4868,16 @@ ${sMessage}`;
                                             <img src="${docData}" alt="Certificate Document" />
                                           </body>
                                         </html>
-                                      `);
+                                      `;
+                                    // iOS Safari frequently fails to render document.write into a fresh
+                                    // about:blank tab. Serving the HTML from a blob URL works everywhere.
+                                    const blob = new Blob([html], { type: 'text/html' });
+                                    const url = URL.createObjectURL(blob);
+                                    const win = window.open(url, '_blank');
+                                    if (win) {
+                                      setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                    } else {
+                                      URL.revokeObjectURL(url);
                                     }
                                   } else {
                                     const link = document.createElement('a');

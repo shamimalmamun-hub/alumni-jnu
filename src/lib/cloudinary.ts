@@ -62,7 +62,9 @@ export async function optimizeImage(
   { maxDim = 1600, quality = 0.82 }: { maxDim?: number; quality?: number } = {}
 ): Promise<File> {
   const type = file.type;
-  if (!/^image\/(jpeg|png|webp)$/.test(type)) return file;
+  // iPhone photos arrive as HEIC/HEIF (or with an empty type on some pickers) — they must be
+  // re-encoded to JPEG, otherwise raw HEIC flows to the server and blows past the body cap.
+  if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(type) && (type !== '' || !/\.(heic|heif)$/i.test(file.name))) return file;
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));

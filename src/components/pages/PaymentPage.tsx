@@ -268,9 +268,24 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
     }
   };
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedKey(key);
+    } catch {
+      // iOS Safari in non-secure contexts blocks the clipboard — leave feedback absent.
+    }
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
@@ -920,7 +935,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
             </div>
 
             {/* Submission Form */}
-            <form onSubmit={handleFormSubmit} className="bg-white rounded-2xl p-4 sm:p-6 border border-emerald-200 shadow-sm space-y-5">
+            <form onSubmit={handleFormSubmit} noValidate className="bg-white rounded-2xl p-4 sm:p-6 border border-emerald-200 shadow-sm space-y-5">
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="w-7 h-7 rounded-full bg-[#006a4e] text-white flex items-center justify-center font-bold text-xs">

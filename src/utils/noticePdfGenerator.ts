@@ -21,6 +21,7 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
 <html lang="${isBn ? 'bn' : 'en'}">
 <head>
   <meta charset="UTF-8">
+  <base href="${window.location.origin}/">
   <title>${title} - Official Notice</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -313,7 +314,10 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
 </html>
   `;
 
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  // iOS Safari frequently fails to render document.write into a fresh about:blank tab.
+  // Serving the HTML from a blob URL renders reliably everywhere.
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  printWindow.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

@@ -67,9 +67,24 @@ export const MembershipPaymentSection: React.FC<MembershipPaymentSectionProps> =
   const typeNameBn = membershipType === 'life' ? 'আজীবন সদস্য' : membershipType === 'unpaid' ? 'Unpaid Option (পরে ফি জমা)' : 'সাধারণ সদস্য';
   const typeNameEn = membershipType === 'life' ? 'Life Member' : membershipType === 'unpaid' ? 'Unpaid Option' : 'General Member';
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedKey(key);
+    } catch {
+      // iOS Safari in non-secure contexts blocks the clipboard — leave feedback absent.
+    }
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
@@ -452,7 +467,7 @@ export const MembershipPaymentSection: React.FC<MembershipPaymentSectionProps> =
       </div>
 
       {/* Payment Information Form */}
-      <form onSubmit={handlePaymentSubmit} className="bg-white border-2 border-emerald-700/60 rounded-xl p-4 sm:p-6 shadow-lg space-y-5">
+      <form onSubmit={handlePaymentSubmit} noValidate className="bg-white border-2 border-emerald-700/60 rounded-xl p-4 sm:p-6 shadow-lg space-y-5">
         <div className="border-b border-gray-200 pb-3">
           <h3 className="text-base sm:text-lg font-black text-gray-900 flex items-center gap-2 font-serif-bn">
             <CreditCard className="w-5 h-5 text-[#006a4e]" />

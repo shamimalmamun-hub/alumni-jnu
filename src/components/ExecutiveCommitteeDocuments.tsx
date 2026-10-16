@@ -79,9 +79,7 @@ export const ExecutiveCommitteeDocuments: React.FC<ExecutiveCommitteeDocumentsPr
   };
 
   const handlePrintImage = (item: DocumentImageItem) => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
+    const html = `
         <!DOCTYPE html>
         <html>
           <head>
@@ -99,9 +97,18 @@ export const ExecutiveCommitteeDocuments: React.FC<ExecutiveCommitteeDocumentsPr
             <img src="${item.imageSrc}" alt="${item.titleBn}" onload="window.print();window.close();" />
           </body>
         </html>
-      `);
-      printWindow.document.close();
+      `;
+    // iOS Safari frequently fails to render document.write into a fresh about:blank tab.
+    // Serving the HTML from a blob URL renders reliably everywhere.
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (!printWindow) {
+      URL.revokeObjectURL(url);
+      alert('Please allow popups to print this document.');
+      return;
     }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   // Helper for role badge colors - all roles now use the requested amber theme
