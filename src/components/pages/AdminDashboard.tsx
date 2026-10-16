@@ -4438,6 +4438,7 @@ ${sMessage}`;
         const nid = selectedMember.nidNumber || '';
         const occ = selectedMember.occupation || selectedMember.occupationCategory || '';
         const otherOcc = selectedMember.otherOccupation || '';
+        const org = selectedMember.organizationPosition || '';
         const photo = selectedMember.userPhotoUrl || selectedMember.photoUrl || '';
         const sigUrl = selectedMember.signatureDataUrl || '';
         const sigName = selectedMember.signatureName || nameEn || nameBn;
@@ -5023,6 +5024,18 @@ ${sMessage}`;
                           )}
                         </div>
                       </div>
+
+                      {/* Organization & Position */}
+                      {org && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="w-full sm:w-36 font-semibold text-gray-800 shrink-0 text-xs sm:text-sm">
+                            Organization / Position <span className="hidden sm:inline float-right mr-1">:</span>
+                          </span>
+                          <div className="flex-1 border border-gray-400 rounded px-3 py-1.5 text-xs sm:text-sm text-gray-900 bg-white font-medium">
+                            {org}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

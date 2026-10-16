@@ -145,7 +145,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       setFormData((prev) => ({ ...prev, photoUrl: url }));
     } catch (err) {
       console.error(err);
-      alert('Photo upload failed. Please try again.');
+      alert(`Photo upload failed: ${err instanceof Error ? err.message : 'Please try again.'}`);
     }
   };
 
@@ -158,7 +158,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       setFormData((prev) => ({ ...prev, degreeDocName: file.name, degreeDocData: url }));
     } catch (err) {
       console.error(err);
-      alert('Document upload failed. Please try again.');
+      alert(`Document upload failed: ${err instanceof Error ? err.message : 'Please try again.'}`);
     }
   };
 
@@ -170,7 +170,7 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
       setFormData((prev) => ({ ...prev, signatureDataUrl: url }));
     } catch (err) {
       console.error(err);
-      alert('Signature upload failed. Please try again.');
+      alert(`Signature upload failed: ${err instanceof Error ? err.message : 'Please try again.'}`);
     }
   };
 
