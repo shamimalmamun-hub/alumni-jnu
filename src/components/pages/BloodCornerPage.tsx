@@ -10,13 +10,14 @@ import {
   UserCheck, 
   AlertCircle
 } from 'lucide-react';
+import { listDocuments, watch } from '../../lib/db';
 
 interface Donor {
   id: string;
   nameBn: string;
   nameEn: string;
   photoUrl?: string;
-  bloodGroup: 'A+' | 'A-' | 'B+' | 'B-' | 'O+' | 'O-' | 'AB+' | 'AB-';
+  bloodGroup: string;
   sessionBn: string;
   sessionEn: string;
   phone: string;
@@ -24,52 +25,30 @@ interface Donor {
   locationEn: string;
 }
 
-const INITIAL_DONORS: Donor[] = [
-  {
-    id: 'donor-1',
-    nameBn: 'মইনুল হোসেন শাকের',
-    nameEn: 'Moynul Hossain Shaker',
-    bloodGroup: 'AB+',
-    sessionBn: '২০১৪-২০১৫',
-    sessionEn: '2014-2015',
-    phone: '01557766933',
-    locationBn: 'বাড্ডা, ঢাকা',
-    locationEn: 'Badda, Dhaka'
-  },
-  {
-    id: 'donor-2',
-    nameBn: 'মোঃ সামসুল আলম',
-    nameEn: 'Md. Samsul Alom',
-    bloodGroup: 'O+',
-    sessionBn: '২০০৫-০৬',
-    sessionEn: '2005-06',
-    phone: '01719417602',
-    locationBn: 'কুষ্টিয়া',
-    locationEn: 'Kushtia'
-  },
-  {
-    id: 'donor-3',
-    nameBn: 'মোঃ মেহেদী হাসান',
-    nameEn: 'Md. Mehedi Hasan',
-    bloodGroup: 'O+',
-    sessionBn: '২০১০-২০১১',
-    sessionEn: '2010-2011',
-    phone: '01795186813',
-    locationBn: 'পটুয়াখালী',
-    locationEn: 'Patuakhali'
-  },
-  {
-    id: 'donor-4',
-    nameBn: 'মনিরুজ্জামান মনির',
-    nameEn: 'Moniruzzaman Monir',
-    bloodGroup: 'O+',
-    sessionBn: '২০১৭-১৮',
-    sessionEn: '2017-18',
-    phone: '01919107480',
-    locationBn: 'মিরপুর-১৪, ঢাকা',
-    locationEn: 'Mirpur 14, Dhaka'
-  }
-];
+const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+const toBnDigits = (str: string) => str.replace(/[0-9]/g, (d) => BN_DIGITS[Number(d)]);
+const toEnDigits = (str: string) => str.replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)));
+
+/** Blood Corner shows every approved member (from the registration form) who listed a blood group. */
+const memberToDonor = (m: Record<string, any>): Donor | null => {
+  const bloodGroup = String(m.bloodGroup || '').trim();
+  if (!bloodGroup) return null;
+  const session = String(m.session || m.batch || '').trim();
+  const location = String(m.presentAddress || m.permanentAddress || m.district || '').trim();
+  return {
+    id: m.id,
+    nameBn: m.applicantNameBn || m.applicantNameEn || 'নামহীন সদস্য',
+    nameEn: m.applicantNameEn || m.applicantNameBn || '',
+    photoUrl: m.userPhotoUrl || m.photoUrl || '',
+    bloodGroup,
+    sessionEn: session,
+    sessionBn: toBnDigits(session),
+    // Localize only the digits so `tel:` links always work, whatever was typed in the form.
+    phone: toEnDigits(String(m.mobile || m.phone || '')).replace(/[^\d+]/g, ''),
+    locationBn: location,
+    locationEn: location,
+  };
+};
 
 interface BloodCornerPageProps {
   language: 'bn' | 'en';
@@ -77,24 +56,19 @@ interface BloodCornerPageProps {
 }
 
 export const BloodCornerPage: React.FC<BloodCornerPageProps> = ({ language, onBackToHome }) => {
-  const [donors, setDonors] = useState<Donor[]>(() => {
-    try {
-      const saved = localStorage.getItem('botany_blood_donors_v4');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {}
-    return INITIAL_DONORS;
-  });
+  const [donors, setDonors] = useState<Donor[]>([]);
 
   const [selectedGroup, setSelectedGroup] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('botany_blood_donors_v4', JSON.stringify(donors));
-    } catch (e) {}
-  }, [donors]);
+  useEffect(
+    () =>
+      watch('memberships', async () => {
+        const docs = await listDocuments<Record<string, any>>('memberships', { where: { status: 'approved' } });
+        setDonors(docs.map(memberToDonor).filter((d): d is Donor => d !== null));
+      }),
+    []
+  );
 
   const bloodGroups = ['ALL', 'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 

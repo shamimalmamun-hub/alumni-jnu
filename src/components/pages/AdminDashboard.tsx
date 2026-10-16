@@ -832,7 +832,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Update Membership Status
-  const handleUpdateMemberStatus = async (id: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+  const handleUpdateMemberStatus = async (
+    id: string,
+    newStatus: 'pending' | 'approved' | 'rejected',
+    options?: { markPaid?: boolean }
+  ) => {
     try {
       const targetMember = memberships.find((m) => m.id === id) || (selectedMember?.id === id ? selectedMember : null);
 
@@ -846,7 +850,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         status: newStatus
       };
 
-      if (newStatus === 'approved') {
+      if (newStatus === 'approved' && options?.markPaid !== false) {
         updates.paymentStatus = 'paid';
         updates.paidAt = new Date().toISOString();
         if (targetMember?.paymentMethod === 'Unpaid') {
@@ -869,7 +873,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         void sendStatusEmail(targetMember, newStatus);
       }
 
-      if (newStatus === 'approved') {
+      if (newStatus === 'approved' && options?.markPaid !== false) {
         showToast(
           language === 'bn'
             ? '✓ সফলভাবে পেমেন্ট Paid নিশ্চিত করা হয়েছে এবং নিবন্ধিত তালিকায় স্থানান্তরিত হয়েছে!'
@@ -1703,13 +1707,24 @@ Botany Alumni Association, Jagannath University`);
   // ---------------- DONATIONS AGGREGATION & LOGIC ----------------
   const allDonations: PaymentRecord[] = React.useMemo(() => {
     // 1. Every payment record from the DB is a fund ledger entry
-    //    (donations, membership fees, unpaid placeholders) — show actual data.
-    const fromPayments = [...payments];
+    //    (donations, membership fees) — show actual data.
+    // "Unpaid Option" placeholders (৳0 / method Unpaid / TrxID UNPAID)
+    // are NOT real money, so they never enter the fund ledger.
+    const fromPayments = payments.filter(
+      (p) =>
+        (Number(p.amount) || 0) > 0 &&
+        p.paymentMethod !== 'Unpaid' &&
+        (p.transactionId || '').toUpperCase() !== 'UNPAID'
+    );
 
     // 2. Also check memberships where note/membershipType is donation
     const fromMemberships: PaymentRecord[] = [];
     memberships.forEach((m) => {
-      if (m.membershipType === 'donation' || (m.adminNotes && m.adminNotes.toLowerCase().includes('donation'))) {
+      if (
+        (m.membershipType === 'donation' || (m.adminNotes && m.adminNotes.toLowerCase().includes('donation'))) &&
+        m.paymentStatus !== 'unpaid' &&
+        m.paymentMethod !== 'Unpaid'
+      ) {
         const amt = parseInt((m.feeAmount || '0').replace(/[^0-9]/g, ''), 10) || 0;
         fromMemberships.push({
           id: `mem-${m.id}`,
@@ -3099,19 +3114,32 @@ Botany Alumni Association, Jagannath University`);
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-gray-100">
                             <div className="flex items-center gap-1.5">
                               {m.status !== 'approved' || m.paymentStatus === 'unpaid' || m.paymentMethod === 'Unpaid' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateMemberStatus(m.id, 'approved')}
-                                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                  title={language === 'bn' ? 'পেমেন্ট প্রাপ্তির পর Paid চিহ্নিত করে নিবন্ধিত তালিকায় স্থানান্তর করুন' : 'Mark as Paid & Approve Member'}
-                                >
-                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>
-                                    {m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid'
-                                      ? (language === 'bn' ? 'Paid (নিবন্ধিত করুন)' : 'Mark Paid')
-                                      : (language === 'bn' ? 'এপ্রুভ করুন' : 'Approve')}
-                                  </span>
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateMemberStatus(m.id, 'approved')}
+                                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                    title={language === 'bn' ? 'পেমেন্ট প্রাপ্তির পর Paid চিহ্নিত করে নিবন্ধিত তালিকায় স্থানান্তর করুন' : 'Mark as Paid & Approve Member'}
+                                  >
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    <span>
+                                      {m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid'
+                                        ? (language === 'bn' ? 'Paid (নিবন্ধিত করুন)' : 'Mark Paid')
+                                        : (language === 'bn' ? 'এপ্রুভ করুন' : 'Approve')}
+                                    </span>
+                                  </button>
+                                  {(m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid') && m.status !== 'approved' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateMemberStatus(m.id, 'approved', { markPaid: false })}
+                                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 border-2 border-emerald-300 text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
+                                      title={language === 'bn' ? 'শুধুমাত্র ফরম অনুমোদন করুন (পেমেন্ট অপরিবর্তিত থাকবে)' : 'Approve form only (payment stays unchanged)'}
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
+                                      <span>{language === 'bn' ? 'অনুমোদন' : 'Approve'}</span>
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
@@ -3181,13 +3209,13 @@ Botany Alumni Association, Jagannath University`);
                             />
                           </th>
                           <th className="py-3.5 px-3">#</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'ফরম নং' : 'Form No'}</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'আবেদনকারীর নাম ও ছবি' : 'Applicant'}</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'ব্যাচ ও সেশন' : 'Batch / Session'}</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'মোবাইল ও ইমেইল' : 'Contact'}</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'ফি ও ট্রানজেকশন' : 'Fee & Payment'}</th>
-                          <th className="py-3.5 px-4">{language === 'bn' ? 'অনুমোদন স্থিতি' : 'Status'}</th>
-                          <th className="py-3.5 px-4 text-right">{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'ফরম নং' : 'Form No'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'আবেদনকারীর নাম ও ছবি' : 'Applicant'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'ব্যাচ ও সেশন' : 'Batch / Session'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'মোবাইল ও ইমেইল' : 'Contact'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'ফি ও ট্রানজেকশন' : 'Fee & Payment'}</th>
+                          <th className="py-3 px-2 xl:px-4">{language === 'bn' ? 'অনুমোদন স্থিতি' : 'Status'}</th>
+                          <th className="py-3 px-2 xl:px-4 text-right">{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -3213,13 +3241,13 @@ Botany Alumni Association, Jagannath University`);
                               <td className="py-3.5 px-3 font-mono text-gray-400 text-[11px]">
                                 {absoluteIndex}
                               </td>
-                              <td className="py-3.5 px-4">
-                                <span className="font-mono text-xs font-bold bg-gray-100 text-gray-800 px-2 py-0.5 rounded border border-gray-200">
+                              <td className="py-3 px-2 xl:px-4">
+                                <span className="font-mono text-[11px] font-bold bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap">
                                   {m.formNo || m.id.slice(-6)}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4">
-                                <div className="flex items-center gap-2.5">
+                              <td className="py-3 px-2 xl:px-4">
+                                <div className="flex items-center gap-2">
                                   <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold overflow-hidden shrink-0 text-xs shadow-2xs">
                                     {m.userPhotoUrl ? (
                                       <img src={m.userPhotoUrl} alt="" className="w-full h-full object-cover" />
@@ -3227,12 +3255,12 @@ Botany Alumni Association, Jagannath University`);
                                       <span>{(m.applicantNameBn || m.fullName || 'ম').charAt(0)}</span>
                                     )}
                                   </div>
-                                  <div>
-                                    <div className="font-bold text-gray-900 group-hover:text-[#006a4e]">
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-gray-900 group-hover:text-[#006a4e] truncate max-w-[120px] xl:max-w-[170px]">
                                       {m.applicantNameBn || m.fullName}
                                     </div>
                                     {m.occupation && (
-                                      <div className="text-[10px] text-gray-500">{m.occupation}</div>
+                                      <div className="text-[10px] text-gray-500 truncate max-w-[120px] xl:max-w-[170px]">{m.occupation}</div>
                                     )}
                                     {(m.degreeDocData || m.degreeDocName) && (
                                       <div className="mt-0.5">
@@ -3245,25 +3273,25 @@ Botany Alumni Association, Jagannath University`);
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-3.5 px-4">
-                                <div className="font-semibold text-gray-900">{m.batch || '—'}</div>
-                                <div className="text-[10px] text-emerald-700 font-mono">{m.session || '—'}</div>
+                              <td className="py-3 px-2 xl:px-4">
+                                <div className="font-semibold text-gray-900 whitespace-nowrap">{m.batch || '—'}</div>
+                                <div className="text-[10px] text-emerald-700 font-mono whitespace-nowrap">{m.session || '—'}</div>
                               </td>
-                              <td className="py-3.5 px-4">
-                                <div className="font-mono font-bold text-gray-800">{m.mobile}</div>
+                              <td className="py-3 px-2 xl:px-4">
+                                <div className="font-mono font-bold text-gray-800 whitespace-nowrap text-[11px] xl:text-xs">{m.mobile}</div>
                                 {m.email && (
-                                  <div className="text-[10px] text-gray-500 truncate max-w-[140px]">{m.email}</div>
+                                  <div className="text-[10px] text-gray-500 truncate max-w-[110px]">{m.email}</div>
                                 )}
                               </td>
-                              <td className="py-3.5 px-4">
-                                <div className="font-bold text-[#006a4e] font-mono text-sm">৳ {m.feeAmount || '৫০০'}</div>
-                                <div className="text-[11px] text-gray-700 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <td className="py-3 px-2 xl:px-4">
+                                <div className="font-bold text-[#006a4e] font-mono text-sm whitespace-nowrap">৳ {m.feeAmount || '৫০০'}</div>
+                                <div className="text-[10px] xl:text-[11px] text-gray-700 font-mono flex items-center gap-1.5 flex-wrap mt-0.5">
                                   {m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid' ? (
-                                    <span className="font-extrabold text-red-800 bg-red-100 border border-red-300 px-2 py-0.5 rounded uppercase">
+                                    <span className="font-extrabold text-red-800 bg-red-100 border border-red-300 px-1.5 py-0.5 rounded uppercase text-[10px]">
                                       Unpaid
                                     </span>
                                   ) : (
-                                    <span className="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                    <span className="font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 whitespace-nowrap text-[10px]">
                                       {m.paymentMethod || 'Manual'}
                                     </span>
                                   )}
@@ -3273,13 +3301,13 @@ Botany Alumni Association, Jagannath University`);
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         navigator.clipboard.writeText(m.transactionId || '');
-                                        showToast(language === 'bn' ? `TrxID কপি হয়েছে: ${m.transactionId}` : `TrxID copied: ${m.transactionId}`);
+                                        showToast(language === 'bn' ? `TrxID কপি হয়েছে: ${m.transactionId}` : `TrxID copied: ${m.transactionId}`);
                                       }}
-                                      className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-rose-100 transition-colors cursor-pointer"
+                                      className="min-w-0 font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-rose-100 transition-colors cursor-pointer"
                                       title={language === 'bn' ? 'TrxID কপি করতে ক্লিক করুন' : 'Click to copy TrxID'}
                                     >
-                                      <span>Trx: {m.transactionId}</span>
-                                      <Copy className="w-3 h-3 text-rose-500" />
+                                      <span className="truncate max-w-[90px]">Trx: {m.transactionId}</span>
+                                      <Copy className="w-3 h-3 text-rose-500 shrink-0" />
                                     </button>
                                   )}
                                 </div>
@@ -3289,31 +3317,32 @@ Botany Alumni Association, Jagannath University`);
                                   </div>
                                 )}
                               </td>
-                              <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                              <td className="py-3 px-2 xl:px-4" onClick={(e) => e.stopPropagation()}>
                                 {m.status === 'approved' && m.paymentStatus === 'paid' && m.paymentMethod !== 'Unpaid' ? (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] xl:text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs whitespace-nowrap">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-700" />
                                     <span>{language === 'bn' ? 'অনুমোদিত' : 'Approved'}</span>
                                   </span>
                                 ) : m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid' ? (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-red-100 text-red-950 border border-red-300 shadow-2xs">
-                                    <Clock className="w-3.5 h-3.5 text-red-700" />
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] xl:text-xs font-black bg-red-100 text-red-950 border border-red-300 shadow-2xs whitespace-nowrap">
+                                    <Clock className="w-3 h-3 text-red-700" />
                                     <span>{language === 'bn' ? 'অনিবন্ধিত (Unpaid)' : 'Unpaid'}</span>
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
-                                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] xl:text-xs font-black bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs whitespace-nowrap">
+                                    <Clock className="w-3 h-3 text-amber-700" />
                                     <span>{language === 'bn' ? 'যাচাই অপেক্ষমান' : 'Pending'}</span>
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3.5 px-4 text-right space-x-1.5" onClick={(e) => e.stopPropagation()}>
+                              <td className="py-3 px-2 xl:px-4 text-right align-middle" onClick={(e) => e.stopPropagation()}>
+                                <div className="inline-flex flex-wrap items-center justify-end gap-1 xl:gap-1.5">
                                 {m.status !== 'approved' || m.paymentStatus === 'unpaid' || m.paymentMethod === 'Unpaid' ? (
                                   <>
                                     <button
                                       type="button"
                                       onClick={() => handleUpdateMemberStatus(m.id, 'approved')}
-                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:shadow"
+                                      className="px-2 xl:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-[10px] xl:text-xs font-black inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:shadow whitespace-nowrap"
                                       title={language === 'bn' ? 'পেমেন্ট পেয়ে থাকলে Paid চিহ্নিত করে নিবন্ধিত তালিকায় স্থানান্তরিত করুন' : 'Mark as Paid & Move to Registered List'}
                                     >
                                       <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -3323,6 +3352,17 @@ Botany Alumni Association, Jagannath University`);
                                           : (language === 'bn' ? 'এপ্রুভ করুন' : 'Approve')}
                                       </span>
                                     </button>
+                                    {m.paymentMethod === 'Unpaid' || m.paymentStatus === 'unpaid' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateMemberStatus(m.id, 'approved', { markPaid: false })}
+                                        className="px-1.5 xl:px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 border-2 border-emerald-300 rounded-xl text-[10px] xl:text-xs font-black inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                                        title={language === 'bn' ? 'শুধুমাত্র ফরম অনুমোদন করুন (পেমেন্ট অপরিবর্তিত থাকবে)' : 'Approve form only (payment stays unchanged)'}
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
+                                        <span>{language === 'bn' ? 'অনুমোদন' : 'Approve'}</span>
+                                      </button>
+                                    ) : null}
                                     <button
                                       type="button"
                                       onClick={() => setSelectedMember(m)}
@@ -3368,6 +3408,7 @@ Botany Alumni Association, Jagannath University`);
                                     </button>
                                   </>
                                 )}
+                                </div>
                               </td>
                             </tr>
                           );
