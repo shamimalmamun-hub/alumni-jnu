@@ -127,6 +127,9 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
               <div className="font-bold text-emerald-900 font-serif-bn">
                 {language === 'bn' ? 'সাধারণ সম্পাদক' : 'General Secretary'}
               </div>
+              <div className="font-bold font-serif-bn text-gray-800">
+                {language === 'bn' ? 'মোঃ মেহেদী হাসান' : 'Md. Mehedi Hasan'}
+              </div>
               <div className="text-[11px] text-gray-500">
                 {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
               </div>
@@ -136,6 +139,9 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
               <div className="w-28 border-b border-dashed border-gray-400 my-3 mx-auto" />
               <div className="font-bold text-emerald-900 font-serif-bn">
                 {language === 'bn' ? 'সভাপতি' : 'President'}
+              </div>
+              <div className="font-bold font-serif-bn text-gray-800">
+                {language === 'bn' ? 'মোঃ আব্দুর রাজ্জাক' : 'Md. Abdur Rajjak'}
               </div>
               <div className="text-[11px] text-gray-500">
                 {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}

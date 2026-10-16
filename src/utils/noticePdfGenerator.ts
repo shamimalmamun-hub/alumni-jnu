@@ -187,6 +187,12 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
       border-top: 1px dashed #6b7280;
       margin-bottom: 8px;
     }
+    .sig-name {
+      font-weight: 700;
+      font-size: 12.5px;
+      color: #1a2e22;
+      font-family: 'Noto Serif Bengali', serif;
+    }
     .sig-title {
       font-weight: 700;
       font-size: 13px;
@@ -297,11 +303,13 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
       <div class="sig-box">
         <div class="sig-line"></div>
         <div class="sig-title">${isBn ? 'সাধারণ সম্পাদক' : 'General Secretary'}</div>
+        <div class="sig-name">${isBn ? 'মোঃ মেহেদী হাসান' : 'Md. Mehedi Hasan'}</div>
         <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}</div>
       </div>
       <div class="sig-box">
         <div class="sig-line"></div>
         <div class="sig-title">${isBn ? 'সভাপতি' : 'President'}</div>
+        <div class="sig-name">${isBn ? 'মোঃ আব্দুর রাজ্জাক' : 'Md. Abdur Rajjak'}</div>
         <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}</div>
       </div>
     </div>
