@@ -64,13 +64,13 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
               />
             </div>
             <h3 className="font-extrabold text-base sm:text-xl text-emerald-950 font-serif-bn leading-tight">
-              {language === 'bn' ? 'জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Jagannath University Botany Alumni Association'}
+              {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Jagannath University Botany Alumni Association'}
             </h3>
             <p className="text-xs sm:text-sm font-bold text-emerald-800">
-              {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১০০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}
+              {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১১০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}
             </p>
             <p className="text-[11px] sm:text-xs text-gray-600 font-mono">
-              {language === 'bn' ? 'ইমেইল: botanyalumni.jnu@gmail.com | ওয়েবসাইট: www.jnubotanyalumni.org' : 'Email: botanyalumni.jnu@gmail.com | Web: www.jnubotanyalumni.org'}
+              {language === 'bn' ? 'ইমেইল: baajnuu@gmail.com | ওয়েবসাইট: www.baajnu.bd' : 'Email: baajnuu@gmail.com | Web: www.baajnu.bd'}
             </p>
           </div>
 
