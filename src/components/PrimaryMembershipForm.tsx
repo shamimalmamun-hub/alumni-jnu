@@ -1867,9 +1867,18 @@ export const PrimaryMembershipForm: React.FC<PrimaryMembershipFormProps> = ({
                 disabled={isSubmitting}
                 className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-[#006a4e] to-[#004d38] hover:from-[#00523d] hover:to-[#003827] text-white text-xs sm:text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer border border-emerald-400 active:scale-98 order-1 sm:order-2"
               >
-                <CreditCard className="w-4 h-4 text-amber-300 shrink-0" />
-                <span>{language === 'bn' ? 'সাবমিট করুন ও পেমেন্ট এ যান' : 'Submit & Proceed to Payment'}</span>
-                <span className="text-amber-300 font-extrabold text-xs sm:text-sm ml-1">→</span>
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 text-amber-300 shrink-0 animate-spin" />
+                    <span>{language === 'bn' ? 'সাবমিট হচ্ছে, অপেক্ষা করুন...' : 'Submitting, please wait...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 text-amber-300 shrink-0" />
+                    <span>{language === 'bn' ? 'সাবমিট করুন ও পেমেন্ট এ যান' : 'Submit & Proceed to Payment'}</span>
+                    <span className="text-amber-300 font-extrabold text-xs sm:text-sm ml-1">→</span>
+                  </>
+                )}
               </button>
 
               <button
