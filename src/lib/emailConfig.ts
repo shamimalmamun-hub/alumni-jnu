@@ -74,7 +74,7 @@ export interface EmailPreset {
   titleEn: string;
   subject: string;
   template: string;
-  category: 'approval' | 'receipt' | 'notice' | 'custom';
+  category: 'approval' | 'receipt' | 'notice' | 'rejection' | 'custom';
 }
 
 export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
@@ -95,6 +95,22 @@ export const EMAIL_PRESET_TEMPLATES: EmailPreset[] = [
 শুভেচ্ছান্তে,
 উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
 জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`,
+  },
+  {
+    id: 'rejection_preset',
+    titleBn: 'সদস্যপদ আবেদন বাতিল (রিজেকশন) ইমেইল',
+    titleEn: 'Membership Rejection Email',
+    category: 'rejection',
+    subject: 'আপনার সদস্যপদ আবেদন পর্যালোচিত হয়েছে - উদ্ভিদবিজ্ঞান অ্যালামনাই',
+    template: `প্রিয় {name},
+
+উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন (জগন্নাথ বিশ্ববিদ্যালয়)-এ আপনার সদস্যপদ আবেদন (ফরম নং: {formNo}) পর্যালোচিত হয়েছে। প্রদত্ত তথ্য ও শর্তাবলির ভিত্তিতে বর্তমানে আপনার আবেদনটি অনুমোদিত হতে পারেনি।
+
+বিস্তারিত জানতে বা আবেদন পুনর্বিবেচনার জন্য অনুগ্রহ করে অ্যাডমিন কর্তৃপক্ষের সাথে যোগাযোগ করুন।
+
+ধন্যবাদান্তে,
+উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন
+জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা।`,
   },
   {
     id: 'receipt_preset',

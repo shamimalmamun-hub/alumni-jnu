@@ -65,6 +65,7 @@ import { deleteDocument, listDocuments, setDocument, setPinToken, loginWithPin, 
 import { getRedirectResult, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { BATCH_SESSION_LIST } from '../../data/batchSessionData';
 import { EmailTemplateSettings } from '../admin/EmailTemplateSettings';
+import { EMAIL_PRESET_TEMPLATES, formatCustomEmail, loadSavedEmailConfig } from '../../lib/emailConfig';
 import { CommunityStatsAdminEditor } from '../admin/CommunityStatsAdminEditor';
 import { optimizeImage, uploadToCloudinary } from '../../lib/cloudinary';
 
@@ -75,6 +76,36 @@ enum OperationType {
   LIST = 'list',
   GET = 'get',
   WRITE = 'write',
+}
+
+function buildBrandedEmailHtml(text: string): string {
+  const formattedParagraphs = text
+    .split('\n')
+    .map((line) => line.trim())
+    .map((line) =>
+      line
+        ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; line-height: 1.6;">${line
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')}</p>`
+        : '<div style="height: 8px;"></div>'
+    )
+    .join('');
+
+  return `
+    <div style="font-family: Arial, Helvetica, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+      <div style="background-color: #006a4e; padding: 24px 20px; text-align: center; border-bottom: 4px solid #fcd34d;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন</h1>
+        <p style="color: #fcd34d; margin: 6px 0 0 0; font-size: 13px; font-weight: 600;">জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা</p>
+      </div>
+      <div style="padding: 28px 24px; background-color: #ffffff;">
+        ${formattedParagraphs}
+      </div>
+      <div style="background-color: #f8fafc; padding: 16px 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+        <p style="margin: 0 0 4px 0;"><strong>উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়</strong></p>
+        <p style="margin: 0;">© ${new Date().getFullYear()} Botany Alumni Association, JnU. All Rights Reserved.</p>
+      </div>
+    </div>
+  `;
 }
 
 interface FirestoreErrorInfo {
@@ -722,6 +753,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
   }, [isAuthenticated]);
 
+  // Auto-send approval / rejection notification email via Resend (non-blocking)
+  const sendStatusEmail = async (member: MembershipRecord, newStatus: 'approved' | 'rejected') => {
+    const recipientEmail = member.email;
+    if (!recipientEmail) {
+      showToast(
+        language === 'bn'
+          ? 'সদস্যের ইমেইল ঠিকানা নেই — অনুমোদন/বাতিল ইমেইল পাঠানো যায়নি।'
+          : 'Member has no email address — notification email skipped.'
+      );
+      return;
+    }
+
+    try {
+      const config = await loadSavedEmailConfig();
+      if (!config.enabled) return;
+
+      const preset =
+        newStatus === 'approved'
+          ? EMAIL_PRESET_TEMPLATES.find((p) => p.id === 'approval_preset')
+          : EMAIL_PRESET_TEMPLATES.find((p) => p.id === 'rejection_preset');
+      if (!preset) return;
+
+      const recipientName = member.applicantNameBn || member.fullName || 'সম্মানিত সদস্য';
+      const text = formatCustomEmail(preset.template, {
+        name: recipientName,
+        formNo: member.formNo || member.membershipId,
+        email: member.email,
+        phone: member.phone || member.mobile,
+        amount: member.feeAmount || (member.membershipType === 'life' ? '২৫০০' : '৫০০'),
+        batch: member.bscSession || member.session,
+      });
+
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: recipientEmail,
+          subject: preset.subject,
+          html: buildBrandedEmailHtml(text),
+          text,
+          applicantName: recipientName,
+          formNo: member.formNo || member.membershipId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.status === 'SUCCESS') {
+        showToast(
+          language === 'bn' ? `ইমেইল পাঠানো হয়েছে: ${recipientEmail}` : `Notification email sent to ${recipientEmail}`
+        );
+      } else {
+        const detail = data?.result?.error || data?.message || 'Unknown error';
+        showToast(
+          language === 'bn'
+            ? `ইমেইল পাঠানো যায়নি (${recipientEmail}): ${detail}`
+            : `Failed to send email to ${recipientEmail}: ${detail}`
+        );
+      }
+    } catch (err: any) {
+      console.error('Auto status email error:', err);
+      showToast(
+        language === 'bn'
+          ? `ইমেইল পাঠাতে সমস্যা: ${err?.message || 'নেটওয়ার্ক সমস্যা'}`
+          : `Email notification failed: ${err?.message || 'Network error'}`
+      );
+    }
+  };
+
   // Update Membership Status
   const handleUpdateMemberStatus = async (id: string, newStatus: 'pending' | 'approved' | 'rejected') => {
     try {
@@ -754,6 +854,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       if (selectedMember && selectedMember.id === id) {
         setSelectedMember({ ...selectedMember, ...updates });
+      }
+
+      if (targetMember && (newStatus === 'approved' || newStatus === 'rejected')) {
+        void sendStatusEmail(targetMember, newStatus);
       }
 
       if (newStatus === 'approved') {
@@ -834,33 +938,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEmailSuccessMsg(null);
 
     try {
-      const formattedParagraphs = emailBody
-        .split('\n')
-        .map((line) => line.trim())
-        .map((line) =>
-          line
-            ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; line-height: 1.6;">${line
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')}</p>`
-            : '<div style="height: 8px;"></div>'
-        )
-        .join('');
-
-      const htmlContent = `
-        <div style="font-family: Arial, Helvetica, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #d1d5db; border-radius: 12px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-          <div style="background-color: #006a4e; padding: 24px 20px; text-align: center; border-bottom: 4px solid #fcd34d;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন</h1>
-            <p style="color: #fcd34d; margin: 6px 0 0 0; font-size: 13px; font-weight: 600;">জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা</p>
-          </div>
-          <div style="padding: 28px 24px; background-color: #ffffff;">
-            ${formattedParagraphs}
-          </div>
-          <div style="background-color: #f8fafc; padding: 16px 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
-            <p style="margin: 0 0 4px 0;"><strong>উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়</strong></p>
-            <p style="margin: 0;">© ${new Date().getFullYear()} Botany Alumni Association, JnU. All Rights Reserved.</p>
-          </div>
-        </div>
-      `;
+      const htmlContent = buildBrandedEmailHtml(emailBody);
 
       const res = await fetch('/api/send-email', {
         method: 'POST',
