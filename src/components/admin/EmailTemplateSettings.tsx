@@ -29,7 +29,7 @@ import {
   loadSavedEmailConfig,
   saveEmailFullConfig,
 } from '../../lib/emailConfig';
-import { MembershipRecord } from '../pages/AdminDashboard';
+import { MembershipRecord } from './types';
 
 interface EmailTemplateSettingsProps {
   language: 'bn' | 'en';

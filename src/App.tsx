@@ -23,7 +23,7 @@ import { MembersListPage } from './components/pages/MembersListPage';
 import { PaymentPage } from './components/pages/PaymentPage';
 import { BloodCornerPage } from './components/pages/BloodCornerPage';
 import { JobNewsPage } from './components/pages/JobNewsPage';
-import { AdminDashboard } from './components/pages/AdminDashboard';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { DonationSelectionModal, DonationCategoryType } from './components/DonationSelectionModal';
 import { MemberCardModal, CardMemberData } from './components/MemberCardModal';
 import { MemberFormPdfModal } from './components/MemberFormPdfModal';

@@ -14,7 +14,7 @@ INSERT INTO members (
   'BAAJNU-2024-001',          -- form_no
   'BAAJNU-2024-001',          -- membership_id
   'general',                  -- membership_type
-  'approved',                 -- status
+  'pending',                  -- status
   '2024-01-15',               -- application_date
   'Test Alumni',              -- applicant_name_en
   'টেস্ট অ্যালামনাই',          -- applicant_name_bn
@@ -27,7 +27,7 @@ INSERT INTO members (
   '2013-14',                  -- session
   '2016',                     -- batch
   '500',                      -- fee_amount
-  'verified',                 -- payment_status
+  'unpaid',                   -- payment_status
   'bkash',                    -- payment_method
   '01712345678',              -- sender_number
   'SEEDTRX0001',              -- trx_number
