@@ -53,7 +53,8 @@ import {
   Award,
   Image as ImageIcon,
   Newspaper,
-  SlidersHorizontal
+  SlidersHorizontal,
+  CircleOff
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
@@ -316,7 +317,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   });
 
   // Navigation tabs: overview, unregistered, registered, lifetime, memberships, donations, community-stats, feedbacks, notices, recent-news, email
-  const [activeTab, setActiveTab] = useState<'overview' | 'unregistered' | 'registered' | 'lifetime' | 'memberships' | 'donations' | 'community-stats' | 'feedbacks' | 'notices' | 'recent-news' | 'email'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'unregistered' | 'unpaid' | 'registered' | 'lifetime' | 'memberships' | 'donations' | 'community-stats' | 'feedbacks' | 'notices' | 'recent-news' | 'email'>('overview');
 
   // Recent News State & Modals
   const [recentNewsItems, setRecentNewsItems] = useState<NewsPost[]>(() => NEWS_POSTS);
@@ -1689,6 +1690,9 @@ Botany Alumni Association, Jagannath University`);
   const lifetimeCount = lifetimeMembers.length;
   const rejectedCount = memberships.filter((m) => m.status === 'rejected').length;
   const paidCount = memberships.filter((m) => m.paymentStatus === 'paid' && m.paymentMethod !== 'Unpaid').length;
+  const unpaidCount = memberships.filter(
+    (m) => m.paymentStatus !== 'paid' || m.paymentMethod === 'Unpaid'
+  ).length;
 
   const totalFees = memberships.reduce((acc, curr) => {
     const raw = curr.feeAmount || '500';
@@ -1698,17 +1702,9 @@ Botany Alumni Association, Jagannath University`);
 
   // ---------------- DONATIONS AGGREGATION & LOGIC ----------------
   const allDonations: PaymentRecord[] = React.useMemo(() => {
-    // 1. Extract from payments collection
-    const fromPayments = payments.filter((p) => {
-      const pType = (p.purposeType || '').toLowerCase();
-      const pPurp = (p.purpose || '').toLowerCase();
-      return (
-        pType === 'donation' ||
-        pPurp.includes('donation') ||
-        pPurp.includes('অনুদান') ||
-        pPurp.includes('ডোনেশন')
-      );
-    });
+    // 1. Every payment record from the DB is a fund ledger entry
+    //    (donations, membership fees, unpaid placeholders) — show actual data.
+    const fromPayments = [...payments];
 
     // 2. Also check memberships where note/membershipType is donation
     const fromMemberships: PaymentRecord[] = [];
@@ -1954,6 +1950,8 @@ Botany Alumni Association, Jagannath University`);
     let matchTab = true;
     if (activeTab === 'unregistered') {
       matchTab = m.status !== 'approved' || m.paymentStatus === 'unpaid' || m.paymentMethod === 'Unpaid' || m.paymentStatus !== 'paid';
+    } else if (activeTab === 'unpaid') {
+      matchTab = m.paymentStatus !== 'paid' || m.paymentMethod === 'Unpaid';
     } else if (activeTab === 'registered') {
       matchTab = m.status === 'approved' && m.paymentStatus === 'paid' && m.paymentMethod !== 'Unpaid';
     } else if (activeTab === 'lifetime') {
@@ -1961,7 +1959,7 @@ Botany Alumni Association, Jagannath University`);
     }
 
     const matchStatus =
-      activeTab === 'unregistered' || activeTab === 'registered' || activeTab === 'lifetime'
+      activeTab === 'unregistered' || activeTab === 'unpaid' || activeTab === 'registered' || activeTab === 'lifetime'
         ? true
         : statusFilter === 'all' ||
           (statusFilter === 'pending' && (!m.status || m.status === 'pending' || m.status === 'payment_pending')) ||
@@ -2253,6 +2251,30 @@ Botany Alumni Association, Jagannath University`);
                     }`}
                   >
                     {approvedCount}
+                  </span>
+                </button>
+
+                {/* 3.5 Unpaid Members List */}
+                <button
+                  onClick={() => setActiveTab('unpaid')}
+                  className={`w-full text-left px-4 py-3 text-sm sm:text-base rounded-xl transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                    activeTab === 'unpaid'
+                      ? 'bg-[#006a4e] text-white font-extrabold shadow-sm'
+                      : 'text-gray-800 hover:bg-emerald-50 hover:text-[#004d38] font-bold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <CircleOff className={`w-5 h-5 shrink-0 ${activeTab === 'unpaid' ? 'text-amber-300' : 'text-red-600'}`} />
+                    <span className="truncate">{language === 'bn' ? 'অপরিশোধিত সদস্য তালিকা' : 'Unpaid Members List'}</span>
+                  </div>
+                  <span
+                    className={`text-xs font-black px-2.5 py-0.5 rounded-full font-mono shrink-0 ${
+                      activeTab === 'unpaid'
+                        ? 'bg-red-300 text-red-950'
+                        : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    {unpaidCount}
                   </span>
                 </button>
 
@@ -2642,7 +2664,7 @@ Botany Alumni Association, Jagannath University`);
         )}
 
         {/* ================= TAB 2: MEMBERSHIPS MANAGEMENT (OVERVIEW, UNREGISTERED, REGISTERED & LIFETIME) ================= */}
-        {(activeTab === 'overview' || activeTab === 'unregistered' || activeTab === 'registered' || activeTab === 'lifetime' || activeTab === 'memberships') && (
+        {(activeTab === 'overview' || activeTab === 'unregistered' || activeTab === 'unpaid' || activeTab === 'registered' || activeTab === 'lifetime' || activeTab === 'memberships') && (
           <div className="space-y-5 animate-in fade-in duration-300">
             {/* View Switcher: All Applications vs Unregistered vs Registered vs Lifetime */}
             <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-emerald-100 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
@@ -2678,6 +2700,23 @@ Botany Alumni Association, Jagannath University`);
                     activeTab === 'unregistered' ? 'bg-amber-500/30 text-amber-950' : 'bg-gray-200 text-gray-700'
                   }`}>
                     {pendingCount}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('unpaid')}
+                  className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${
+                    activeTab === 'unpaid'
+                      ? 'bg-red-700 text-white shadow-sm'
+                      : 'text-gray-700 hover:bg-white/80'
+                  }`}
+                >
+                  <CircleOff className="w-3.5 h-3.5 text-red-600" />
+                  <span>{language === 'bn' ? 'অপরিশোধিত সদস্য' : 'Unpaid Members'}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    activeTab === 'unpaid' ? 'bg-red-600/30 text-red-100' : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {unpaidCount}
                   </span>
                 </button>
 
@@ -2772,6 +2811,29 @@ Botany Alumni Association, Jagannath University`);
                     {language === 'bn'
                       ? 'প্রতিটি আবেদনকারীর প্রদত্ত TrxID ও প্রেরক নম্বর মিলিয়ে আপনার বিকাশ/ব্যাংক একাউন্টে ফি জমা হওয়া নিশ্চিত করুন। ট্রানজেকশন সঠিক থাকলে সরাসরি "✓ এপ্রুভ করুন" বাটনে ক্লিক করুন। এপ্রুভ করার সাথে সাথে আবেদনকারী নিবন্ধিত তালিকায় চলে যাবে।'
                       : 'Verify each applicant\'s TrxID and Sender Number. Once payment is confirmed, click "Approve" to automatically move them to the Registered List.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'unpaid' && (
+              <div className="bg-gradient-to-r from-red-50 via-rose-50 to-red-100/50 border-2 border-red-300/80 p-4 rounded-2xl flex items-start gap-3.5 shadow-xs">
+                <div className="p-2 bg-red-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                  <CircleOff className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div className="text-xs text-red-950 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-black text-sm text-red-950">
+                      {language === 'bn' ? 'অপরিশোধিত সদস্য তালিকা (পেমেন্ট বাকি রয়েছে)' : 'Unpaid Members List (Payment Pending)'}
+                    </h3>
+                    <span className="bg-red-200 text-red-900 text-[10px] font-black px-2 py-0.5 rounded-full border border-red-300">
+                      অপরিশোধিত: {unpaidCount} জন
+                    </span>
+                  </div>
+                  <p className="text-red-900/90 leading-relaxed font-medium">
+                    {language === 'bn'
+                      ? 'এই তালিকায় সকল সদস্য রয়েছে যারা এখনো মেম্বারশিপ ফি পরিশোধ করেননি (Unpaid) — এপ্রুভড কিংবা পেন্ডিং স্ট্যাটাস যা-ই হোক। পেমেন্ট নিশ্চিত হলে "Paid (নিবন্ধিত করুন)" বাটনে ক্লিক করে তাদের নিবন্ধিত তালিকায় যুক্ত করুন।'
+                      : 'Showing all members who have not paid the membership fee yet (Unpaid) — regardless of approval status. Once payment is confirmed, click "Paid (Approve)" to move them to the Registered List.'}
                   </p>
                 </div>
               </div>
