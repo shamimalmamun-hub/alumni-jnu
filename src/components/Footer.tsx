@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, Mail, MapPin, Facebook, GraduationCap, BookOpen, Library, Landmark, Award } from 'lucide-react';
+import { Phone, Mail, MapPin, Facebook, Globe, GraduationCap, BookOpen, Library, Landmark, Award } from 'lucide-react';
 
 interface FooterProps {
   language: 'bn' | 'en';
@@ -150,8 +150,14 @@ export const Footer: React.FC<FooterProps> = ({ language }) => {
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-5 h-5 text-emerald-400 shrink-0" />
-                <a href="mailto:baajnu@gmail.com" className="hover:text-amber-300 transition-colors">
-                  baajnu@gmail.com
+                <a href="mailto:baajnuu@gmail.com" className="hover:text-amber-300 transition-colors">
+                  baajnuu@gmail.com
+                </a>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Globe className="w-5 h-5 text-emerald-400 shrink-0" />
+                <a href="https://www.baajnu.bd" target="_blank" rel="noopener noreferrer" className="hover:text-amber-300 transition-colors">
+                  www.baajnu.bd
                 </a>
               </div>
               <div className="flex items-center gap-2.5">

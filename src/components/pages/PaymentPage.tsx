@@ -1487,7 +1487,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                   📞 01557766933
                 </a>
                 <a
-                  href="mailto:baajnu@gmail.com"
+                  href="mailto:baajnuu@gmail.com"
                   className="px-3.5 py-2 bg-white text-gray-800 border border-gray-300 text-xs font-bold rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   ✉️ Email Desk

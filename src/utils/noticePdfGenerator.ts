@@ -245,7 +245,7 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
       <img src="/jnu_botany_alumni_logo.jpg" alt="Logo" class="logo-img" onerror="this.src='/logo.jpg'">
       <h1 class="org-title">${isBn ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Botany Alumni Association, Jagannath University'}</h1>
       <p class="dept-title">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১০০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}</p>
-      <p class="contact-line">${isBn ? 'ইমেইল: botanyalumni.jnu@gmail.com | ওয়েবসাইট: www.jnubotanyalumni.org' : 'Email: botanyalumni.jnu@gmail.com | Web: www.jnubotanyalumni.org'}</p>
+      <p class="contact-line">${isBn ? 'ইমেইল: baajnuu@gmail.com | ওয়েবসাইট: www.baajnu.bd' : 'Email: baajnuu@gmail.com | Web: www.baajnu.bd'}</p>
     </div>
 
     <div class="meta-bar">

@@ -102,8 +102,8 @@ export const ContactPage: React.FC<ContactPageProps> = ({ language, onBackToHome
                 <Mail className="w-5 h-5 text-[#006a4e] shrink-0" />
                 <div>
                   <strong className="block text-gray-900">{language === 'bn' ? 'অফিসিয়াল ইমেইল' : 'Official Email'}</strong>
-                  <a href="mailto:baajnu@gmail.com" className="text-[#006a4e] hover:underline font-semibold">
-                    baajnu@gmail.com
+                  <a href="mailto:baajnuu@gmail.com" className="text-[#006a4e] hover:underline font-semibold">
+                    baajnuu@gmail.com
                   </a>
                 </div>
               </div>
