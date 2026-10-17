@@ -67,7 +67,7 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
               {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Jagannath University Botany Alumni Association'}
             </h3>
             <p className="text-xs sm:text-sm font-bold text-emerald-800">
-              {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১১০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}
+              {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১১০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}
             </p>
             <p className="text-[11px] sm:text-xs text-gray-600 font-mono">
               {language === 'bn' ? 'ইমেইল: baajnuu@gmail.com | ওয়েবসাইট: www.baajnu.bd' : 'Email: baajnuu@gmail.com | Web: www.baajnu.bd'}
@@ -115,7 +115,7 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
             )}
             <p className="text-xs text-emerald-800 italic pt-2 border-t border-gray-100">
               {language === 'bn'
-                ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সকল সম্মানিত সদস্য ও সংশ্লিষ্টদের অবগতির জন্য প্রকাশ করা হলো।'
+                ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশনের সকল সম্মানিত সদস্য ও সংশ্লিষ্টদের অবগতির জন্য প্রকাশ করা হলো।'
                 : 'Published for the information of all honorable members and concerned parties of the Botany Alumni Association.'}
             </p>
           </div>
@@ -131,7 +131,7 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
                 {language === 'bn' ? 'মোঃ মেহেদী হাসান' : 'Md. Mehedi Hasan'}
               </div>
               <div className="text-[11px] text-gray-500">
-                {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
+                {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
               </div>
             </div>
 
@@ -144,7 +144,7 @@ export const NoticeModal: React.FC<NoticeModalProps> = ({
                 {language === 'bn' ? 'মোঃ আব্দুর রাজ্জাক' : 'Md. Abdur Rajjak'}
               </div>
               <div className="text-[11px] text-gray-500">
-                {language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
+                {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}
               </div>
             </div>
           </div>
