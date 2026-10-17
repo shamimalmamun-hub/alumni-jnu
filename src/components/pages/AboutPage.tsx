@@ -84,8 +84,8 @@ export const AboutPage: React.FC<AboutPageProps> = ({ language, onBackToHome, on
 
             <p>
               {language === 'bn'
-                ? 'উল্লেখ্য, ১০/০২/২০২১ তারিখে বিশ্ববিদ্যালয়ের রেজিস্টার দপ্তর থেকে জানানো হয়, কেবলমাত্র জগন্নাথ বিশ্ববিদ্যালয়ের সনদধারীরাই জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন এর সদস্য হতে পারবেন। অতঃপর দীর্ঘদিন অকার্যকর থাকার পর ৩০/০৮/২০২৪ তারিখে বিভাগের অ্যালামনাইগণ আরেকটি সাধারণ সভার আয়োজন করে নতুন আহ্বায়ক কমিটি গঠন করে। সভায় জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন এর নতুন নাম রাখা হয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়।'
-                : 'Notably, on 10/02/2021, the Registrar\'s Office notified that only degree holders from Jagannath University are eligible for membership in the association. After remaining dormant for years, on 30/08/2024, alumni convened a general meeting to reform the convening committee and officially renamed the body to "Botany Alumni Association Jagannath University".'}
+                ? 'উল্লেখ্য, ১০/০২/২০২১ তারিখে বিশ্ববিদ্যালয়ের রেজিস্টার দপ্তর থেকে জানানো হয়, কেবলমাত্র জগন্নাথ বিশ্ববিদ্যালয়ের সনদধারীরাই জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন এর সদস্য হতে পারবেন। অতঃপর দীর্ঘদিন অকার্যকর থাকার পর ৩০/০৮/২০২৪ তারিখে বিভাগের অ্যালামনাইগণ আরেকটি সাধারণ সভার আয়োজন করে নতুন আহ্বায়ক কমিটি গঠন করে। সভায় জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন এর নতুন নাম রাখা হয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়।'
+                : 'Notably, on 10/02/2021, the Registrar\'s Office notified that only degree holders from Jagannath University are eligible for membership in the association. After remaining dormant for years, on 30/08/2024, alumni convened a general meeting to reform the convening committee and officially renamed the body to "Botany Alumni Association, Jagannath University".'}
             </p>
 
             <p className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200/80 text-emerald-950 font-medium">
@@ -108,11 +108,11 @@ export const AboutPage: React.FC<AboutPageProps> = ({ language, onBackToHome, on
             <p>
               {language === 'bn' ? (
                 <>
-                  এ অ্যাসোসিয়েশনের নাম হবে <strong>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়</strong>; ইংরেজিতে <strong>Botany Alumni Association Jagannath University</strong>; ইংরেজি নামের সংক্ষিপ্ত রূপ হবে <strong>BAAJnU</strong>।
+                  এ অ্যাসোসিয়েশনের নাম হবে <strong>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়</strong>; ইংরেজিতে <strong>Botany Alumni Association, Jagannath University</strong>; ইংরেজি নামের সংক্ষিপ্ত রূপ হবে <strong>BAAJnU</strong>।
                 </>
               ) : (
                 <>
-                  The official name of this association shall be <strong>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়</strong>; in English: <strong>Botany Alumni Association Jagannath University</strong>; with the official English acronym <strong>BAAJnU</strong>.
+                  The official name of this association shall be <strong>উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়</strong>; in English: <strong>Botany Alumni Association, Jagannath University</strong>; with the official English acronym <strong>BAAJnU</strong>.
                 </>
               )}
             </p>
@@ -157,7 +157,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ language, onBackToHome, on
                 গ
               </span>
               <div className="text-xs sm:text-sm text-gray-800">
-                <strong className="text-emerald-950">{language === 'bn' ? '"অ্যাসোসিয়েশন"' : '"Association"'}</strong> {language === 'bn' ? 'অর্থ উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়;' : 'means Botany Alumni Association Jagannath University;'}
+                <strong className="text-emerald-950">{language === 'bn' ? '"অ্যাসোসিয়েশন"' : '"Association"'}</strong> {language === 'bn' ? 'অর্থ উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়;' : 'means Botany Alumni Association, Jagannath University;'}
               </div>
             </div>
 
@@ -202,7 +202,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ language, onBackToHome, on
                 জ
               </span>
               <div className="text-xs sm:text-sm text-gray-800">
-                <strong className="text-emerald-950">{language === 'bn' ? '"গঠনতন্ত্র"' : '"Constitution"'}</strong> {language === 'bn' ? 'অর্থ উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়ের গঠনতন্ত্র।' : 'means the Constitution of Botany Alumni Association Jagannath University.'}
+                <strong className="text-emerald-950">{language === 'bn' ? '"গঠনতন্ত্র"' : '"Constitution"'}</strong> {language === 'bn' ? 'অর্থ উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের গঠনতন্ত্র।' : 'means the Constitution of Botany Alumni Association, Jagannath University.'}
               </div>
             </div>
           </div>

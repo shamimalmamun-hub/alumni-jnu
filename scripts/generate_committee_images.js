@@ -32,7 +32,7 @@ const page1Svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1280"
   <line x1="70" y1="160" x2="830" y2="160" stroke="#111827" stroke-width="1.2"/>
 
   <!-- Document Title -->
-  <text x="450" y="195" font-size="20" font-weight="bold" fill="#111827" text-anchor="middle">জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন</text>
+  <text x="450" y="195" font-size="20" font-weight="bold" fill="#111827" text-anchor="middle">উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়</text>
 
   <!-- Meeting intro -->
   <text x="70" y="235" font-size="13" fill="#1f2937" textLength="760">অদ্য ০৪/০৮/২০১৭ তারিখে উদ্ভিদবিজ্ঞান বিভাগ থেকে ডিগ্রিপ্রাপ্ত প্রাক্তন শিক্ষার্থীদের নিয়ে উদ্ভিদবিজ্ঞান বিভাগে</text>

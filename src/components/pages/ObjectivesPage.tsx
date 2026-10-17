@@ -150,7 +150,7 @@ export const ObjectivesPage: React.FC<ObjectivesPageProps> = ({
                   {language === 'bn' ? 'লক্ষ্য ও উদ্দেশ্য' : 'Aims & Objectives'}
                 </h1>
                 <p className="text-xs text-gray-500">
-                  {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা' : 'Botany Alumni Association Jagannath University, Dhaka'}
+                  {language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা' : 'Botany Alumni Association Jagannath University, Dhaka'}
                 </p>
               </div>
             </div>
@@ -161,7 +161,7 @@ export const ObjectivesPage: React.FC<ObjectivesPageProps> = ({
 
           <div className="p-3.5 sm:p-4 bg-emerald-50/70 rounded-xl border border-emerald-200/80 text-xs sm:text-sm font-semibold text-emerald-950 leading-relaxed">
             {language === 'bn'
-              ? 'লক্ষ্য ও উদ্দেশ্য: উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়ের লক্ষ্য ও উদ্দেশ্য নিম্নরূপ:'
+              ? 'লক্ষ্য ও উদ্দেশ্য: উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের লক্ষ্য ও উদ্দেশ্য নিম্নরূপ:'
               : 'Aims & Objectives: The aims and objectives of Botany Alumni Association Jagannath University are as follows:'}
           </div>
 
@@ -205,7 +205,7 @@ export const ObjectivesPage: React.FC<ObjectivesPageProps> = ({
           <div className="mt-6 pt-5 border-t border-emerald-100 bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 text-center space-y-2">
             <p className="text-xs sm:text-sm text-emerald-950 font-bold">
               {language === 'bn'
-                ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১১০০'
+                ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১১০০'
                 : 'Botany Alumni Association Jagannath University, Dhaka-1100'}
             </p>
             <p className="text-xs text-gray-600">

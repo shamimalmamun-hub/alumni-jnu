@@ -43,8 +43,8 @@ export const NewsSection: React.FC<NewsSectionProps> = ({ language }) => {
             </h2>
             <p className="text-[11px] sm:text-xs text-emerald-100">
               {language === 'bn'
-                ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন এর কার্যক্রম, পুনর্মিলনী ও সেমিনার সমাচার'
-                : 'Botany Department Alumni Association activities, reunion updates & events'}
+                ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের কার্যক্রম, পুনর্মিলনী ও সেমিনার সমাচার'
+                : 'Botany Alumni Association, Jagannath University activities, reunion updates & events'}
             </p>
           </div>
         </div>

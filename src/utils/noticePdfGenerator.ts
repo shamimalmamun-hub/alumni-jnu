@@ -243,7 +243,7 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
   <div class="page-container">
     <div class="letterhead">
       <img src="/jnu_botany_alumni_logo.jpg" alt="Logo" class="logo-img" onerror="this.src='/logo.jpg'">
-      <h1 class="org-title">${isBn ? 'জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Jagannath University Botany Alumni Association'}</h1>
+      <h1 class="org-title">${isBn ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Botany Alumni Association, Jagannath University'}</h1>
       <p class="dept-title">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়, ঢাকা-১০০০' : 'Department of Botany, Jagannath University, Dhaka-1000'}</p>
       <p class="contact-line">${isBn ? 'ইমেইল: botanyalumni.jnu@gmail.com | ওয়েবসাইট: www.jnubotanyalumni.org' : 'Email: botanyalumni.jnu@gmail.com | Web: www.jnubotanyalumni.org'}</p>
     </div>
@@ -295,8 +295,8 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
 
     <div class="verification-note">
       ${isBn 
-        ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সকল সম্মানিত সদস্য ও সংশ্লিষ্টদের অবগতির জন্য প্রকাশ করা হলো।'
-        : 'Published for the information of all honorable members and concerned parties of the Botany Alumni Association.'}
+        ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সকল সম্মানিত সদস্য ও সংশ্লিষ্টদের অবগতির জন্য প্রকাশ করা হলো।'
+        : 'Published for the information of all honorable members and concerned parties of the Botany Alumni Association, Jagannath University.'}
     </div>
 
     <div class="signature-section">
@@ -304,18 +304,18 @@ export function openNoticePdf(notice: NoticeItem, language: 'bn' | 'en' = 'bn') 
         <div class="sig-line"></div>
         <div class="sig-title">${isBn ? 'সাধারণ সম্পাদক' : 'General Secretary'}</div>
         <div class="sig-name">${isBn ? 'মোঃ মেহেদী হাসান' : 'Md. Mehedi Hasan'}</div>
-        <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}</div>
+        <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Botany Alumni Association, Jagannath University'}</div>
       </div>
       <div class="sig-box">
         <div class="sig-line"></div>
         <div class="sig-title">${isBn ? 'সভাপতি' : 'President'}</div>
         <div class="sig-name">${isBn ? 'মোঃ আব্দুর রাজ্জাক' : 'Md. Abdur Rajjak'}</div>
-        <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association'}</div>
+        <div class="sig-sub">${isBn ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Botany Alumni Association, Jagannath University'}</div>
       </div>
     </div>
 
     <div class="footer-stamp">
-      ${isBn ? 'ডিজিটাল নোটিশ বোর্ড • জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন' : 'Digital Notice Board • Jagannath University Botany Alumni Association'}
+      ${isBn ? 'ডিজিটাল নোটিশ বোর্ড • উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Digital Notice Board • Botany Alumni Association, Jagannath University'}
     </div>
   </div>
 </body>

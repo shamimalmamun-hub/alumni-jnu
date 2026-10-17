@@ -605,7 +605,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       >
         <img
           src="/web_cover.jfif"
-          alt={language === 'bn' ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশন ব্যানার' : 'Department of Botany Alumni Association Banner'}
+          alt={language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয় ব্যানার' : 'Department of Botany Alumni Association Banner'}
           className="w-full h-auto max-h-[420px] object-cover object-center block"
         />
       </div>

@@ -13,8 +13,8 @@ interface FAQItem {
 const FAQ_LIST: FAQItem[] = [
   {
     id: 'faq-1',
-    questionBn: 'জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সদস্য হতে কারা যোগ্য?',
-    questionEn: 'Who is eligible to become a member of the Botany Department Alumni Association?',
+    questionBn: 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সদস্য হতে কারা যোগ্য?',
+    questionEn: 'Who is eligible to become a member of the Botany Alumni Association, Jagannath University?',
     answerBn: 'জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগ থেকে ডিগ্রি প্রাপ্ত (কলেজ এবং বিশ্ববিদ্যালয়) স্নাতক (সম্মান), স্নাতকোত্তর বা উচ্চতর ডিগ্রিতে উত্তীর্ণ সকল প্রাক্তন শিক্ষার্থী অ্যালামনাই অ্যাসোসিয়েশনের সদস্য হওয়ার যোগ্য।',
     answerEn: 'All former students who obtained degrees (college and university: B.Sc Honours, M.Sc, or higher degrees) from the Department of Botany, Jagannath University are eligible to become members of the Alumni Association.',
     category: 'alumni'

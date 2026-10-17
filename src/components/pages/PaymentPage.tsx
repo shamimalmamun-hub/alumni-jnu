@@ -1445,7 +1445,7 @@ export const PaymentPage: React.FC<PaymentPageProps> = ({
                 <div className="w-full md:w-1/2 space-y-2.5 text-xs">
                   <p className="text-gray-700 leading-relaxed font-medium">
                     {language === 'bn'
-                      ? 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের যাকাত তহবিলের অর্থ সরাসরি অসচ্ছল মেধাবী শিক্ষার্থীদের আর্থিক বৃত্তি এবং অসুস্থ বা বিপদগ্রস্ত অ্যালামনাইদের চিকিৎসায় ব্যয় হয়।'
+                      ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের যাকাত তহবিলের অর্থ সরাসরি অসচ্ছল মেধাবী শিক্ষার্থীদের আর্থিক বৃত্তি এবং অসুস্থ বা বিপদগ্রস্ত অ্যালামনাইদের চিকিৎসায় ব্যয় হয়।'
                       : 'Zakat funds are directly disbursed to underprivileged botany students as education grants and distressed alumni as medical assistance.'}
                   </p>
                   <div className="pt-2">

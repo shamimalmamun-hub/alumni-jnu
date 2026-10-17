@@ -123,9 +123,9 @@ export const SECRETARY_BIO = {
   email: 'razzak90jnu.bd@gmail.com',
   ministryBn: 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়',
   ministryEn: 'Department of Botany, Jagannath University',
-  bioBn: 'মোঃ আব্দুর রাজ্জাক জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ১ম ব্যাচের (সেশন: ২০০৫-২০০৬) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সম্মানিত সভাপতি হিসেবে দায়িত্ব পালন করছেন। প্রাক্তন ও বর্তমান শিক্ষার্থীদের মেলবন্ধন সুদৃঢ় করতে এবং বিভাগীয় সার্বিক অগ্রগতিতে তিনি সক্রিয় ভূমিকা রেখে চলেছেন।',
+  bioBn: 'মোঃ আব্দুর রাজ্জাক জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ১ম ব্যাচের (সেশন: ২০০৫-২০০৬) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সম্মানিত সভাপতি হিসেবে দায়িত্ব পালন করছেন। প্রাক্তন ও বর্তমান শিক্ষার্থীদের মেলবন্ধন সুদৃঢ় করতে এবং বিভাগীয় সার্বিক অগ্রগতিতে তিনি সক্রিয় ভূমিকা রেখে চলেছেন।',
   bioEn: 'Md. Abdur Razzak is a 1st batch (Session: 2005-2006) alumnus of the Department of Botany, Jagannath University, and currently serves as the President of the Botany Alumni Association, dedicated to uniting alumni and advancing departmental excellence.',
-  messageBn: 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সকল সম্মানিত সদস্য, শিক্ষকবৃন্দ ও প্রিয় শিক্ষার্থীদের আন্তরিক শুভেচ্ছা। আমাদের জগন্নাথ কলেজ ও জগন্নাথ বিশ্ববিদ্যালয়ের সকল অ্যালামনাইদের সৌহার্দ্যপূর্ণ ঐক্য, পারস্পরিক সহযোগিতা ও ঐতিহ্য ধরে রাখতে আমরা একসাথে কাজ করে যাব।',
+  messageBn: 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সকল সম্মানিত সদস্য, শিক্ষকবৃন্দ ও প্রিয় শিক্ষার্থীদের আন্তরিক শুভেচ্ছা। আমাদের জগন্নাথ কলেজ ও জগন্নাথ বিশ্ববিদ্যালয়ের সকল অ্যালামনাইদের সৌহার্দ্যপূর্ণ ঐক্য, পারস্পরিক সহযোগিতা ও ঐতিহ্য ধরে রাখতে আমরা একসাথে কাজ করে যাব।',
   messageEn: 'Warm greetings to all esteemed members, faculty, and dear students of the Botany Alumni Association. We will work together to uphold cordial unity, mutual collaboration, and the rich legacy of all alumni of Jagannath College and Jagannath University.',
 };
 
@@ -142,9 +142,9 @@ export const GENERAL_SECRETARY_BIO = {
   email: 'mehedihasanbotn019@gmail.com',
   ministryBn: 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়',
   ministryEn: 'Department of Botany, Jagannath University',
-  bioBn: 'মোঃ মেহেদী হাসান জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ৭ম ব্যাচের (সেশন: ২০১০-২০১১) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সাধারণ সম্পাদক হিসেবে অত্যন্ত নিষ্ঠার সাথে দায়িত্ব পালন করছেন। সকল প্রাক্তন শিক্ষার্থীদের মধ্যে সৌহার্দ্যপূর্ণ ঐক্য, নিয়মিত যোগাযোগ, পুনর্মিলনী ও কল্যাণমূলক কার্যক্রম পরিচালনায় তিনি সক্রিয় ভূমিকা রাখছেন।',
+  bioBn: 'মোঃ মেহেদী হাসান জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ৭ম ব্যাচের (সেশন: ২০১০-২০১১) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সাধারণ সম্পাদক হিসেবে অত্যন্ত নিষ্ঠার সাথে দায়িত্ব পালন করছেন। সকল প্রাক্তন শিক্ষার্থীদের মধ্যে সৌহার্দ্যপূর্ণ ঐক্য, নিয়মিত যোগাযোগ, পুনর্মিলনী ও কল্যাণমূলক কার্যক্রম পরিচালনায় তিনি সক্রিয় ভূমিকা রাখছেন।',
   bioEn: 'Md. Mehedi Hasan is a 7th batch (Session: 2010-2011) alumnus of the Department of Botany, Jagannath University, and serves as the General Secretary of the Botany Alumni Association, dedicated to alumni fellowship, reunions, and departmental welfare.',
-  messageBn: 'উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের সকল সদস্য ও শুভানুধ্যায়ীদের আন্তরিক শুভেচ্ছা। আমাদের মূল লক্ষ্য প্রাক্তন ও বর্তমান শিক্ষার্থীদের মধ্যে আজীবন মেলবন্ধন, সৌহার্দ্য ও সহযোগিতার পরিবেশ সুদৃঢ় করা।',
+  messageBn: 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের সকল সদস্য ও শুভানুধ্যায়ীদের আন্তরিক শুভেচ্ছা। আমাদের মূল লক্ষ্য প্রাক্তন ও বর্তমান শিক্ষার্থীদের মধ্যে আজীবন মেলবন্ধন, সৌহার্দ্য ও সহযোগিতার পরিবেশ সুদৃঢ় করা।',
   messageEn: 'Heartiest greetings to all members and well-wishers of the Botany Alumni Association. Our primary goal is to foster lifelong fellowship and unity.'
 };
 
@@ -161,7 +161,7 @@ export const TREASURER_BIO = {
   email: 'shaker.jnu@gmail.com',
   ministryBn: 'উদ্ভিদবিজ্ঞান বিভাগ, জগন্নাথ বিশ্ববিদ্যালয়',
   ministryEn: 'Department of Botany, Jagannath University',
-  bioBn: 'মো: ময়নুল হোসাইন সাকের জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ১০ম ব্যাচের (সেশন: ২০১৪-২০১৫) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান বিভাগ অ্যালামনাই অ্যাসোসিয়েশনের কোষাধ্যক্ষ হিসেবে অ্যাসোসিয়েশনের তহবিল ব্যবস্থাপনা, আর্থিক স্বচ্ছতা এবং পুনর্মিলনী ও কল্যাণ তহবিলের সুষ্ঠু হিসাব সংরক্ষণে নিবেদিতভাবে কাজ করছেন।',
+  bioBn: 'মো: ময়নুল হোসাইন সাকের জগন্নাথ বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান বিভাগের ১০ম ব্যাচের (সেশন: ২০১৪-২০১৫) শিক্ষার্থী এবং বর্তমানে উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের কোষাধ্যক্ষ হিসেবে অ্যাসোসিয়েশনের তহবিল ব্যবস্থাপনা, আর্থিক স্বচ্ছতা এবং পুনর্মিলনী ও কল্যাণ তহবিলের সুষ্ঠু হিসাব সংরক্ষণে নিবেদিতভাবে কাজ করছেন।',
   bioEn: 'Md. Moinul Hossain Shaker is a 10th batch (Session: 2014-2015) alumnus of the Department of Botany, Jagannath University, and currently serves as the Treasurer of the Botany Alumni Association, managing financial transparency, welfare funds, and budget audits.',
   messageBn: 'অ্যালামনাই অ্যাসোসিয়েশনের আর্থিক স্বচ্ছতা, জবাবদিহিতা ও টেকসই কল্যাণ তহবিল গঠন আমাদের সর্বোচ্চ অগ্রাধিকার। সকল সম্মানিত সদস্যের সহযোগিতায় আমরা একটি স্বচ্ছ তহবিল পরিচালনায় প্রতিশ্রুতিবদ্ধ।',
   messageEn: 'Financial transparency, accountability, and sustainable welfare funds are our top priorities for the Botany Alumni Association.'
@@ -1241,7 +1241,7 @@ export const NEWS_POSTS: NewsPost[] = [
     date: '১৫ সেপ্টেম্বর, ২০২৬',
     authorBn: 'অ্যালামনাই প্রচার ও ইভেন্ট সেল',
     authorEn: 'Alumni Event & PR Cell',
-    summaryBn: 'জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশনের মহতী পুনর্মিলনী সফল করতে নির্বাহী কমিটির এক বিশেষ প্রস্তুতি সভা অনুষ্ঠিত হয়েছে।',
+    summaryBn: 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়ের মহতী পুনর্মিলনী সফল করতে নির্বাহী কমিটির এক বিশেষ প্রস্তুতি সভা অনুষ্ঠিত হয়েছে।',
     summaryEn: 'Executive committee holds high-level coordination meeting for upcoming Botany Alumni Reunion 2026.',
     contentBn: `জগন্নাথ বিশ্ববিদ্যালয় উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশনের উদ্যোগে আয়োজিতব্য 'গ্র্যান্ড পুনর্মিলনী ২০২৬' সফলভাবে উদযাপনের লক্ষ্যে বিশ্ববিদ্যালয়ের উদ্ভিদবিজ্ঞান মিলনায়তনে এক মহাসভা অনুষ্ঠিত হয়েছে।
     

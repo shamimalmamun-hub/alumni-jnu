@@ -311,7 +311,7 @@ export const ExecutiveCommitteeDocuments: React.FC<ExecutiveCommitteeDocumentsPr
                     <span className={member.organizationBn ? "font-semibold text-emerald-900" : ""}>
                       {member.organizationBn 
                         ? (language === 'bn' ? member.organizationBn : (member.organizationEn || member.organizationBn))
-                        : (language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন' : 'Botany Alumni Association')}
+                        : (language === 'bn' ? 'উদ্ভিদবিজ্ঞান অ্যালামনাই অ্যাসোসিয়েশন, জগন্নাথ বিশ্ববিদ্যালয়' : 'Botany Alumni Association, Jagannath University')}
                     </span>
                   </p>
                 </div>
