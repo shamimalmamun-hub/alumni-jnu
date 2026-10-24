@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+wrangler-build/
+.wrangler/
+server.cjs
+server.cjs.map
+.commandcode/
+.dev.vars
+.playwright-mcp/
