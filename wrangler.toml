@@ -1,0 +1,32 @@
+name = "alumni-jnu"
+main = "src/worker.ts"
+compatibility_date = "2026-08-25"
+
+# Serve on the production domain (zone must be on this Cloudflare account).
+routes = [{ pattern = "baajnu.bd", custom_domain = true }]
+
+[build]
+command = "npm run build"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+exclude = ["*.map", "*.pdf", "*.jfif"]
+
+
+# Cloudflare D1 (replaces Firestore). Create it once with `npx wrangler d1 create alumni-jnu`,
+# paste the printed database_id below, then run `npm run db:migrate:remote`.
+[[d1_databases]]
+binding = "DB"
+database_name = "alumni-jnu"
+database_id = "a874d508-6581-4237-9dd7-c808c4e4821a"
+migrations_dir = "migrations"
+
+[vars]
+# Firebase Auth is still used for admin Google sign-in; the Worker verifies the ID token.
+FIREBASE_PROJECT_ID = "academic-domain-2rr5c"
+# Comma-separated Google accounts allowed into the admin dashboard.
+ADMIN_EMAILS = ""
+# Secrets (set with `npx wrangler secret put`): ADMIN_PIN, ADMIN_TOKEN_SECRET, RESEND_API_KEY
